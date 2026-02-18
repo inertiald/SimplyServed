@@ -1,36 +1,29 @@
 import { useState } from "react";
-import ChatInterface from "./components/chatInterface";
+import Navbar from "./components/Navbar";
 import LandingPage from "./components/LandingPage";
+import ChatInterface from "./components/chatInterface";
+import AboutPage from "./components/AboutPage";
+
 
 function App() {
-  const [page, setPage] = useState<"landing" | "chat">("landing");
+  const [page, setPage] = useState<"home" | "chat" | "about">("home");
 
   return (
-    <>
-      {page === "landing" && (
-        <LandingPage onStart={() => setPage("chat")} />
-      )}
+    <div className="min-h-screen flex flex-col bg-white text-gray-900 font-sans">
+      <Navbar current={page} onNavigate={setPage} />
 
-      {page === "chat" && (
-        <div
-          style={{
-            minHeight: "100vh",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: "20px"
-          }}
-        >
-          <div style={{ width: "100%", maxWidth: "700px" }}>
-            <h2 style={{ textAlign: "center", marginBottom: "20px" }}>
-              SimplyServed Assistant
-            </h2>
-            <ChatInterface />
-          </div>
+      <main className="flex-1 flex justify-center px-6 py-12">
+        <div className="w-full max-w-5xl">
+          {page === "home" && (
+            <LandingPage onStart={() => setPage("chat")} />
+          )}
+
+          {page === "chat" && <ChatInterface />}
+
+          {page === "about" && <AboutPage />}
         </div>
-      )}
-    </>
+      </main>
+    </div>
   );
 }
-
 export default App;
