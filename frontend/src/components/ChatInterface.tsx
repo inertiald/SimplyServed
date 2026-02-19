@@ -1,21 +1,17 @@
 import React, { useState } from "react";
-
-type Receipt = {
-  service: string;
-  provider: string;
-  total: string;
-  confirmationId: string;
-};
+import type { AgentResponse, ToolCall, ThinkingStep } from "../types/agent";
 
 type Message = {
   role: "user" | "model" | "error";
   text: string;
-  receipt?: Receipt;
+  thinkingSteps?: ThinkingStep[];
+  toolCalls?: ToolCall[];
 };
 
 const ChatInterface: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const sendMessage = async () => {
     if (!input.trim()) return;
@@ -23,20 +19,38 @@ const ChatInterface: React.FC = () => {
     const userMessage: Message = { role: "user", text: input };
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
+    setLoading(true);
 
-    // Mock AI response
-    const aiMessage: Message = {
-      role: "model",
-      text: "Your pizza order has been successfully placed!",
-      receipt: {
-        service: "Pizza Order",
-        provider: "Everett Pizza Co",
-        total: "$22.45",
-        confirmationId: "ABC123",
-      },
-    };
+    try {
+      const res = await fetch("/api/agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: input }),
+      });
 
-    setMessages((prev) => [...prev, aiMessage]);
+      if (!res.ok) {
+        throw new Error("Agent request failed");
+      }
+
+      const data: AgentResponse = await res.json();
+
+      const aiMessage: Message = {
+        role: "model",
+        text: data.reply,
+        thinkingSteps: data.thinkingSteps,
+        toolCalls: data.toolCalls,
+      };
+
+      setMessages((prev) => [...prev, aiMessage]);
+    } catch (error) {
+      const errorMessage: Message = {
+        role: "error",
+        text: "Something went wrong. Please try again.",
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -83,24 +97,73 @@ const ChatInterface: React.FC = () => {
                       : "bg-slate-800 text-gray-200 border border-white/5"
                   }`}
                 >
-                  {msg.text}
-
-                  {msg.receipt && (
-                    <div className="mt-4 bg-slate-900 border border-white/10 p-4 rounded-xl text-xs space-y-1">
-                      <p className="font-semibold text-emerald-400">
-                        ✅ Transaction Confirmation
-                      </p>
-                      <p><strong>Service:</strong> {msg.receipt.service}</p>
-                      <p><strong>Provider:</strong> {msg.receipt.provider}</p>
-                      <p><strong>Total:</strong> {msg.receipt.total}</p>
-                      <p className="text-gray-400">
-                        <strong>ID:</strong> {msg.receipt.confirmationId}
-                      </p>
+                  {/* Thinking steps (assistant only) */}
+                  {msg.thinkingSteps && msg.thinkingSteps.length > 0 && (
+                    <div className="mb-3 rounded-lg bg-slate-900/60 text-xs">
+                      <div className="px-3 py-2 text-gray-400 flex items-center gap-2">
+                        <span>🤖</span>
+                        <span>Agent steps ({msg.thinkingSteps.length})</span>
+                      </div>
+                      <ul className="space-y-1 px-3 pb-2">
+                        {msg.thinkingSteps.map((step, i) => (
+                          <li key={i} className="flex items-start gap-2 text-gray-300">
+                            <span className="mt-0.5">
+                              {step.status === "done"
+                                ? "✅"
+                                : step.status === "error"
+                                ? "❌"
+                                : "⏳"}
+                            </span>
+                            <span>{step.message}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
+
+                  {/* Message text */}
+                  {msg.text}
+
+                  {/* Tool call receipts */}
+                  {msg.toolCalls?.map((call, idx) => {
+                    if (!call.result) return null;
+                    const { result } = call;
+                    return (
+                      <div key={idx} className="mt-4 bg-slate-900 border border-white/10 p-4 rounded-xl text-xs space-y-1">
+                        <p className="font-semibold text-emerald-400 flex items-center gap-1">
+                          <span>{call.toolName === "orderPizza" ? "🍕" : "✂️"}</span>
+                          <span>✅ {result.service}</span>
+                        </p>
+                        <p className="text-gray-300">{result.summary}</p>
+                        <div className="space-y-1 text-gray-400">
+                          <p>
+                            <strong className="text-gray-300">Provider:</strong> {result.provider}
+                          </p>
+                          {Object.entries(result.details).map(([k, v]) => (
+                            <p key={k}>
+                              <strong className="text-gray-300">
+                                {k.charAt(0).toUpperCase() + k.slice(1)}:
+                              </strong>{" "}
+                              {v}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
+
+            {/* Loading indicator */}
+            {loading && (
+              <div className="flex justify-start">
+                <div className="max-w-md px-5 py-4 rounded-2xl text-sm bg-slate-800 text-gray-400 border border-white/5 flex items-center gap-2">
+                  <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full"></div>
+                  Eleanor is thinking…
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Input Dock */}
@@ -110,14 +173,16 @@ const ChatInterface: React.FC = () => {
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+                onKeyDown={(e) => e.key === "Enter" && !loading && sendMessage()}
                 placeholder="Ask Eleanor to order pizza..."
-                className="flex-1 bg-transparent px-6 py-4 text-white placeholder-gray-400 outline-none"
+                disabled={loading}
+                className="flex-1 bg-transparent px-6 py-4 text-white placeholder-gray-400 outline-none disabled:opacity-50"
               />
 
               <button
                 onClick={sendMessage}
-                className="bg-indigo-600 hover:bg-indigo-500 px-8 font-semibold text-white transition-all duration-300"
+                disabled={loading || !input.trim()}
+                className="bg-indigo-600 hover:bg-indigo-500 px-8 font-semibold text-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Send
               </button>
