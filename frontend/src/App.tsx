@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Navbar from "./components/Navbar";
 import LandingPage from "./components/LandingPage";
-import ChatInterface from "./components/chatInterface";
+import ChatInterface from "./components/ChatInterface";
 import AboutPage from "./components/AboutPage";
 
 
