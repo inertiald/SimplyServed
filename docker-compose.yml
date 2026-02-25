@@ -1,9 +1,61 @@
+version: '3.8'
+
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  # 1. The Frontend & API Backend
+  web:
+    build: .
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=production
+      # Next.js will use this to connect to the local DB
+      - DATABASE_URL=postgresql://eleanor_user:secretpassword@db:5432/eleanor_dev
+      # Point the Vertex AI SDK to the local LiteLLM proxy
+      - VERTEX_API_ENDPOINT=http://litellm:4000
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/dummy.json # Prevents SDK crash
+      - GCLOUD_PROJECT=local-dev
+    depends_on:
+      - db
+      - litellm
+
+  # 2. The Local Database
+  db:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=eleanor_user
+      - POSTGRES_PASSWORD=secretpassword
+      - POSTGRES_DB=eleanor_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 3. The AI Proxy (Mimics Vertex)
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml
+    command: [ "--config", "/app/config.yaml", "--port", "4000" ]
+    depends_on:
+      - ollama
+
+  # 4. The Local LLM Runner
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # This command starts the server in the background, pulls the model, and brings the server to the foreground
+    entrypoint: >
+      /bin/sh -c "
+      ollama serve & 
+      sleep 5 && 
+      ollama pull llama3.2 && 
+      wait
+      "
+
+volumes:
+  postgres_data:
+  ollama_data:
