@@ -1,27 +1,33 @@
 /**
  * gemini-brain.ts
  *
- * GeminiBrain — replaces MockBrain with a real Gemini-backed intent parser.
+ * GeminiBrain — LLM-backed intent parser using the LiteLLM proxy.
  *
  * Implements the AgentBrain interface so it can be swapped in wherever
  * MockBrain was used without changing the rest of the system.
  *
  * How it works:
- *   1. The user message is sent to Gemini with a structured prompt that
- *      instructs the model to output a JSON array of tool calls.
- *   2. If the model detects an actionable intent it returns one or more
+ *   1. The user message is sent to the LiteLLM proxy (OpenAI-compatible)
+ *      with a structured prompt that instructs the model to output a JSON
+ *      array of tool calls.
+ *   2. LiteLLM maps the "gemini-pro" model alias to ollama/llama3.2.
+ *   3. If the model detects an actionable intent it returns one or more
  *      ToolCall objects (e.g. orderPizza, bookAppointment).
- *   3. If no intent is found it returns an empty array ([]).
- *   4. If the JSON cannot be parsed (model hallucinated free text instead
- *      of JSON), an empty array is returned and the caller falls back to
+ *   4. If no intent is found it returns an empty array ([]).
+ *   5. If the JSON cannot be parsed (model returned free text instead of
+ *      JSON), an empty array is returned and the caller falls back to
  *      generateAIResponse() for a helpful reply.
  */
 
 import type { AgentBrain, ToolCall } from "./types";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
-/** Prompt that tells Gemini to output structured JSON tool calls. */
-const INTENT_PROMPT = `You are an intent-detection engine for a local services app.
+/** LiteLLM proxy endpoint — uses the Docker service hostname so the
+ *  Next.js container can reach it inside the Docker network. */
+const LITELLM_URL =
+  process.env.LITELLM_URL ?? "http://litellm:4000";
+
+/** System prompt that tells the model to output structured JSON tool calls. */
+const INTENT_SYSTEM_PROMPT = `You are an intent-detection engine for a local services app.
 Given a user message, decide which tools (if any) should be called.
 
 Available tools:
@@ -41,44 +47,68 @@ User: "Book a plumber for tomorrow at 3pm"
 Response: [{"toolName":"bookAppointment","params":{"service":"Plumber","date":"Tomorrow","time":"3pm"}}]
 
 User: "What is the weather?"
-Response: []
+Response: []`;
 
-Now parse this message:
-`;
+/** OpenAI-compatible response shape returned by LiteLLM. */
+interface ChatCompletionResponse {
+  choices: Array<{
+    message: {
+      content: string;
+    };
+  }>;
+}
 
 export class GeminiBrain implements AgentBrain {
   /**
-   * Uses Gemini to detect actionable intents in the user message.
-   * Returns an empty array when no intent is found or the API call fails.
+   * Uses the LiteLLM proxy to detect actionable intents in the user message.
+   * Returns an empty array when no intent is found or the request fails.
    */
   async parseIntents(message: string): Promise<ToolCall[]> {
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    // If no API key is configured, fall back silently to no-intent so the
-    // route handler can surface a helpful Gemini text reply instead.
-    if (!apiKey) {
-      console.warn(
-        "[GeminiBrain] GEMINI_API_KEY not set — skipping intent parsing."
-      );
-      return [];
-    }
-
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      // POST to the LiteLLM OpenAI-compatible endpoint.
+      // "gemini-pro" is mapped to ollama/llama3.2 in litellm_config.yaml.
+      const res = await fetch(`${LITELLM_URL}/v1/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          // "gemini-pro" is the model alias defined in litellm_config.yaml;
+          // LiteLLM maps it to ollama/llama3.2 running in the local Docker network.
+          model: "gemini-pro",
+          messages: [
+            { role: "system", content: INTENT_SYSTEM_PROMPT },
+            { role: "user", content: message },
+          ],
+        }),
+      });
 
-      const result = await model.generateContent(
-        `${INTENT_PROMPT}"${message}"`
-      );
-      const raw = result.response.text().trim();
+      if (!res.ok) {
+        console.error(
+          `[GeminiBrain] LiteLLM request failed: ${res.status} ${res.statusText}`
+        );
+        return [];
+      }
+
+      // Parse the OpenAI-format response.
+      const data = (await res.json()) as ChatCompletionResponse;
+      if (!data.choices?.length) {
+        console.error("[GeminiBrain] LiteLLM returned an empty choices array.");
+        return [];
+      }
+      const raw = data.choices[0].message.content.trim();
 
       // Strip optional markdown fences the model sometimes adds.
-      const jsonText = raw.replace(/^```(?:json)?\s*/i, "").replace(/```$/, "").trim();
+      const jsonText = raw
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/```$/, "")
+        .trim();
 
       // Validate the response looks like a JSON array before parsing
       // to catch cases where the model returned free text instead of JSON.
       if (!jsonText.startsWith("[")) {
-        console.warn("[GeminiBrain] Unexpected non-array response:", jsonText.slice(0, 100));
+        console.warn(
+          "[GeminiBrain] Unexpected non-array response:",
+          jsonText.slice(0, 100)
+        );
         return [];
       }
 
