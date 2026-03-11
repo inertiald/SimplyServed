@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { AgentResponse, ToolCall, ThinkingStep } from "../types/agent";
 
 type Message = {
@@ -8,10 +8,68 @@ type Message = {
   toolCalls?: ToolCall[];
 };
 
+const SIMULATED_PIPELINE_STEPS = [
+  "Analyzing your request...",
+  "Detecting service intent...",
+  "Searching providers near the user...",
+  "Preparing response...",
+];
+
+const getStepIcon = (status: ThinkingStep["status"]) => {
+  if (status === "done") return "✅";
+  if (status === "error") return "❌";
+  return "⏳";
+};
+
+const randomDelay = (min = 300, max = 700) =>
+  Math.floor(Math.random() * (max - min + 1)) + min;
+
 const ChatInterface: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [agentSteps, setAgentSteps] = useState<ThinkingStep[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const stepTimeoutsRef = useRef<number[]>([]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  useEffect(() => {
+    return () => {
+      stepTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      stepTimeoutsRef.current = [];
+    };
+  }, []);
+
+  const clearStepSimulation = () => {
+    stepTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+    stepTimeoutsRef.current = [];
+  };
+
+  const startStepSimulation = () => {
+    clearStepSimulation();
+    setAgentSteps([]);
+
+    SIMULATED_PIPELINE_STEPS.forEach((message, index) => {
+      const cumulativeDelay = SIMULATED_PIPELINE_STEPS
+        .slice(0, index + 1)
+        .reduce((total) => total + randomDelay(), 0);
+
+      const timeoutId = window.setTimeout(() => {
+        setAgentSteps((prev) => {
+          const nextSteps = [...prev, { message, status: "running" as const }];
+
+          return nextSteps.map((step, i) =>
+            i === nextSteps.length - 1 ? { ...step, status: "done" as const } : step
+          );
+        });
+      }, cumulativeDelay);
+
+      stepTimeoutsRef.current.push(timeoutId);
+    });
+  };
 
   const sendMessage = async () => {
     if (!input.trim()) return;
@@ -20,6 +78,7 @@ const ChatInterface: React.FC = () => {
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setLoading(true);
+    startStepSimulation();
 
     try {
       const res = await fetch("/api/agent", {
@@ -34,21 +93,28 @@ const ChatInterface: React.FC = () => {
 
       const data: AgentResponse = await res.json();
 
+      const finalThinkingSteps =
+        data.thinkingSteps && data.thinkingSteps.length > 0
+          ? data.thinkingSteps
+          : SIMULATED_PIPELINE_STEPS.map((message) => ({ message, status: "done" as const }));
+
       const aiMessage: Message = {
         role: "model",
         text: data.reply,
-        thinkingSteps: data.thinkingSteps,
+        thinkingSteps: finalThinkingSteps,
         toolCalls: data.toolCalls,
       };
 
       setMessages((prev) => [...prev, aiMessage]);
-    } catch (error) {
+    } catch {
       const errorMessage: Message = {
         role: "error",
         text: "Something went wrong. Please try again.",
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
+      clearStepSimulation();
+      setAgentSteps([]);
       setLoading(false);
     }
   };
@@ -107,13 +173,7 @@ const ChatInterface: React.FC = () => {
                       <ul className="space-y-1 px-3 pb-2">
                         {msg.thinkingSteps.map((step, i) => (
                           <li key={i} className="flex items-start gap-2 text-gray-300">
-                            <span className="mt-0.5">
-                              {step.status === "done"
-                                ? "✅"
-                                : step.status === "error"
-                                ? "❌"
-                                : "⏳"}
-                            </span>
+                            <span className="mt-0.5">{getStepIcon(step.status)}</span>
                             <span>{step.message}</span>
                           </li>
                         ))}
@@ -158,12 +218,33 @@ const ChatInterface: React.FC = () => {
             {/* Loading indicator */}
             {loading && (
               <div className="flex justify-start">
-                <div className="max-w-md px-5 py-4 rounded-2xl text-sm bg-slate-800 text-gray-400 border border-white/5 flex items-center gap-2">
-                  <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full"></div>
-                  Eleanor is thinking…
+                <div className="max-w-md px-5 py-4 rounded-2xl text-sm bg-slate-800 text-gray-400 border border-white/5 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full"></div>
+                    Eleanor is thinking…
+                  </div>
+
+                  {agentSteps.length > 0 && (
+                    <div className="rounded-lg bg-slate-900/60 text-xs">
+                      <div className="px-3 py-2 text-gray-400 flex items-center gap-2">
+                        <span>🤖</span>
+                        <span>Agent steps ({agentSteps.length})</span>
+                      </div>
+                      <ul className="space-y-1 px-3 pb-2">
+                        {agentSteps.map((step, i) => (
+                          <li key={i} className="flex items-start gap-2 text-gray-300">
+                            <span className="mt-0.5">{getStepIcon(step.status)}</span>
+                            <span>{step.message}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
+
+            <div ref={messagesEndRef} />
           </div>
 
           {/* Input Dock */}
