@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
-import { MockBrain } from "@/lib/agent/mock-brain";
+// GeminiBrain replaces MockBrain — it uses the Gemini API to detect intents
+// instead of the old regex/heuristic approach.
+import { GeminiBrain } from "@/lib/agent/gemini-brain";
+// generateAIResponse provides a free-form Gemini reply when no tool intent
+// is detected (e.g. general questions about local services).
+import { generateAIResponse } from "@/lib/agent/aiService";
 import { toolRegistry } from "@/lib/agent/tools";
 import type { AgentRequest, AgentResponse, ThinkingStep } from "@/lib/agent/types";
 
-const brain = new MockBrain();
+const brain = new GeminiBrain();
 
 export async function POST(request: Request) {
   try {
@@ -25,13 +30,23 @@ export async function POST(request: Request) {
 
     if (toolCalls.length === 0) {
       steps.push({
-        message: "No actionable intents detected.",
+        message: "No actionable intents detected — asking Gemini for a reply…",
         status: "done",
       });
 
+      // No tool call was identified: fall back to a free-form Gemini response
+      // so the user gets a helpful answer instead of a hardcoded fallback string.
+      let reply: string;
+      try {
+        reply = await generateAIResponse(message);
+      } catch (err) {
+        console.error("[agent/route] generateAIResponse failed:", err);
+        reply =
+          "I'm not sure what you'd like me to do. Try asking me to order a pizza or book a haircut!";
+      }
+
       const response: AgentResponse = {
-        reply:
-          "I'm not sure what you'd like me to do. Try asking me to order a pizza or book a haircut!",
+        reply,
         thinkingSteps: steps,
         toolCalls: [],
       };
