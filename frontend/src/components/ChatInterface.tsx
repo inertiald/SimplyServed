@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import type { AgentResponse, ToolCall, ThinkingStep } from "../types/agent";
+import type { AgentRequest, AgentResponse, ToolCall, ThinkingStep } from "../types/agent";
 
 type Message = {
   role: "user" | "model" | "error";
@@ -29,6 +29,7 @@ const ChatInterface: React.FC = () => {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [agentSteps, setAgentSteps] = useState<ThinkingStep[]>([]);
+  const [sessionId, setSessionId] = useState<string>();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const stepTimeoutsRef = useRef<number[]>([]);
 
@@ -81,10 +82,11 @@ const ChatInterface: React.FC = () => {
     startStepSimulation();
 
     try {
+      const payload: AgentRequest = { message: input, sessionId };
       const res = await fetch("/api/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: input }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -92,6 +94,7 @@ const ChatInterface: React.FC = () => {
       }
 
       const data: AgentResponse = await res.json();
+      setSessionId(data.sessionId);
 
       const finalThinkingSteps =
         data.thinkingSteps && data.thinkingSteps.length > 0
@@ -255,7 +258,7 @@ const ChatInterface: React.FC = () => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !loading && sendMessage()}
-                placeholder="Ask Eleanor to order pizza..."
+                placeholder="Chat with Eleanor..."
                 disabled={loading}
                 className="flex-1 bg-transparent px-6 py-4 text-white placeholder-gray-400 outline-none disabled:opacity-50"
               />

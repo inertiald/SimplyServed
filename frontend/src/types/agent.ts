@@ -22,7 +22,14 @@ export interface ThinkingStep {
 
 /** The full response from the agent API. */
 export interface AgentResponse {
+  sessionId: string;
   reply: string;
   thinkingSteps: ThinkingStep[];
   toolCalls: ToolCall[];
+}
+
+/** Request body sent to the agent API. */
+export interface AgentRequest {
+  message: string;
+  sessionId?: string;
 }

@@ -11,7 +11,12 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { AgentResponse, ThinkingStep, ToolCall } from "@/lib/agent/types";
+import type {
+  AgentRequest,
+  AgentResponse,
+  ThinkingStep,
+  ToolCall,
+} from "@/lib/agent/types";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -169,6 +174,7 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<string>();
   const chatEnd = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -190,15 +196,17 @@ export default function Home() {
     setLoading(true);
 
     try {
+      const payload: AgentRequest = { message: text, sessionId };
       const res = await fetch("/api/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) throw new Error("Agent request failed");
 
       const data: AgentResponse = await res.json();
+      setSessionId(data.sessionId);
 
       const assistantMsg: Message = {
         id: crypto.randomUUID(),
