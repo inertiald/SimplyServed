@@ -1,4 +1,4 @@
-import type { AgentBrain, ToolCall } from "./types";
+import type { AgentBrain, ChatMessage, ToolCall } from "./types";
 
 /**
  * MockBrain — uses regex / heuristics to simulate intent detection.
@@ -6,7 +6,8 @@ import type { AgentBrain, ToolCall } from "./types";
  * Replace this with a real Vertex AI brain by implementing AgentBrain.
  */
 export class MockBrain implements AgentBrain {
-  async parseIntents(message: string): Promise<ToolCall[]> {
+  async parseIntents(conversationHistory: ChatMessage[]): Promise<ToolCall[]> {
+    const message = conversationHistory.at(-1)?.content ?? "";
     const lower = message.toLowerCase();
     const calls: ToolCall[] = [];
 
