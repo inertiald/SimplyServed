@@ -21,6 +21,12 @@ export interface ToolCall {
   result?: ToolResult;
 }
 
+/** A single chat message stored in conversation history. */
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 /** A thinking step shown to the user. */
 export interface ThinkingStep {
   message: string;
@@ -29,6 +35,7 @@ export interface ThinkingStep {
 
 /** The full response from the agent API. */
 export interface AgentResponse {
+  sessionId: string;
   reply: string;
   thinkingSteps: ThinkingStep[];
   toolCalls: ToolCall[];
@@ -37,6 +44,7 @@ export interface AgentResponse {
 /** Request body sent to the agent API. */
 export interface AgentRequest {
   message: string;
+  sessionId?: string;
 }
 
 /**
@@ -44,5 +52,5 @@ export interface AgentRequest {
  * Swap MockBrain for a real Vertex AI implementation later.
  */
 export interface AgentBrain {
-  parseIntents(message: string): Promise<ToolCall[]>;
+  parseIntents(conversationHistory: ChatMessage[]): Promise<ToolCall[]>;
 }
