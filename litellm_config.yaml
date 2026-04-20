@@ -1,8 +1,0 @@
-model_list:
-  # This is the model name your app asks for via LiteLLM
-  - model_name: local-agent-model 
-    litellm_params:
-      # This is the local model LiteLLM will actually use
-      model: ollama/llama3.2 
-      # Points to the Ollama container in the Docker network
-      api_base: http://ollama:11434 
