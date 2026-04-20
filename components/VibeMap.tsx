@@ -118,10 +118,9 @@ export function VibeMap({ initialCoords, providerListings, signedIn }: VibeMapPr
     return cells.map((cell) => {
       const polygon = cellPolygon(cell); // [[lat, lng], …]
       const center = cellCenter(cell);
-      const cellPosts = posts.filter((p) => true /* projection-only */); // counted below
-      return { cell, polygon, center, count: cellPosts.length };
+      return { cell, polygon, center };
     });
-  }, [cells, posts]);
+  }, [cells]);
 
   const postCountsByCell = useMemo(() => {
     const map = new Map<string, number>();
