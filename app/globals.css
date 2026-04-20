@@ -2,25 +2,57 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+:root {
+  --bg: #07080d;
+  --surface: #0d111a;
+  --surface-2: #131826;
+  --border: rgba(255, 255, 255, 0.07);
+  --accent: #6366f1;
+  --accent-2: #ec4899;
 }
 
+html,
 body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  background: radial-gradient(1200px 600px at 80% -20%, rgba(99, 102, 241, 0.18), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(236, 72, 153, 0.16), transparent 55%), var(--bg);
+  color: #e5e7eb;
+  min-height: 100%;
 }
 
-/* Custom scrollbar for chat window */
-.chat-scroll::-webkit-scrollbar {
-  width: 6px;
+*,
+::before,
+::after {
+  border-color: var(--border);
 }
-.chat-scroll::-webkit-scrollbar-track {
-  background: transparent;
+
+@layer components {
+  .ss-card {
+    @apply rounded-2xl border bg-white/[0.03] backdrop-blur-sm shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset];
+  }
+  .ss-input {
+    @apply w-full rounded-xl border bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 outline-none transition focus:border-indigo-400 focus:bg-white/10;
+  }
+  .ss-label {
+    @apply mb-1.5 block text-xs font-medium uppercase tracking-wider text-white/60;
+  }
+  .ss-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .ss-btn-primary {
+    @apply ss-btn bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-white shadow-lg shadow-indigo-500/20 hover:from-indigo-400 hover:to-fuchsia-400;
+  }
+  .ss-btn-ghost {
+    @apply ss-btn border bg-white/5 text-white hover:bg-white/10;
+  }
+  .ss-chip {
+    @apply inline-flex items-center gap-1 rounded-full border bg-white/5 px-2.5 py-0.5 text-xs text-white/80;
+  }
 }
-.chat-scroll::-webkit-scrollbar-thumb {
-  background: #374151;
-  border-radius: 3px;
+
+/* Hide scrollbars on horizontal chip rails. */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
 }

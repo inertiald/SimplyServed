@@ -1,0 +1,191 @@
+// SimplyServed schema
+// Hyper-local services + community vibe platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// 1. DUAL-IDENTITY USER CORE
+// -----------------------------------------------------------------------------
+model User {
+  id              String   @id @default(uuid())
+  email           String   @unique
+  passwordHash    String
+  name            String
+  avatarUrl       String?
+  role            Role     @default(SUBSCRIBER)
+
+  // JSONB profile blobs — avoids 1:1 explosion while keeping fields searchable.
+  consumerProfile Json?    @db.JsonB
+  providerProfile Json?    @db.JsonB
+
+  listings        Listing[]        @relation("ProviderListings")
+  serviceRequests ServiceRequest[] @relation("ConsumerRequests")
+  posts           Post[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+}
+
+enum Role {
+  SUBSCRIBER
+  ADMINISTRATOR
+}
+
+// -----------------------------------------------------------------------------
+// 2. LISTINGS — H3 hex-indexed for hyper-local discovery
+// -----------------------------------------------------------------------------
+model Listing {
+  id          String @id @default(uuid())
+  providerId  String
+  provider    User   @relation("ProviderListings", fields: [providerId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String  @db.Text
+  category    String
+  hourlyRate  Float
+
+  // Geo + H3 indexing (city = res 7, neighborhood = res 9)
+  lat            Float
+  lng            Float
+  h3City         String
+  h3Neighborhood String
+
+  status ListingStatus @default(ACTIVE)
+
+  requests    ServiceRequest[]
+  impressions Impression[]
+  posts       Post[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([h3Neighborhood, status])
+  @@index([h3City, status])
+  @@index([providerId])
+}
+
+enum ListingStatus {
+  NEW
+  ACTIVE
+  INACTIVE
+}
+
+// -----------------------------------------------------------------------------
+// 3. SERVICE REQUEST — workflow state machine
+// -----------------------------------------------------------------------------
+model ServiceRequest {
+  id         String  @id @default(uuid())
+  consumerId String
+  consumer   User    @relation("ConsumerRequests", fields: [consumerId], references: [id], onDelete: Cascade)
+  listingId  String
+  listing    Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  scheduledDate DateTime?
+  status        RequestStatus @default(PLACED)
+
+  feeDetails Json @db.JsonB
+  metadata   Json? @db.JsonB
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([consumerId, status])
+  @@index([listingId, status])
+}
+
+enum RequestStatus {
+  PLACED
+  RESPONDED
+  SCHEDULED
+  CONFIRMED
+  COMMENCED
+  STARTED
+  DELIVERED
+  COMPLETED
+  DROPPED
+  CANCELED
+}
+
+// -----------------------------------------------------------------------------
+// 4. IMPRESSIONS — neighborhood vibe reactions
+// -----------------------------------------------------------------------------
+model Impression {
+  id        String  @id @default(uuid())
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  // HMAC of (user|listing|hour-bucket) — dedupes spam without storing user link.
+  impressionHash String   @unique
+  reactionType   Reaction
+
+  createdAt DateTime @default(now())
+
+  @@index([listingId, reactionType])
+}
+
+enum Reaction {
+  LIKE
+  LOVE
+  WOW
+}
+
+// -----------------------------------------------------------------------------
+// 5. POSTS — polymorphic neighborhood vibe / business / offers
+// -----------------------------------------------------------------------------
+model Post {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  listingId String?
+  listing   Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+
+  postType    PostType  @default(GENERAL)
+  contentText String    @db.Text
+  mediaType   MediaType @default(TEXT_ONLY)
+  mediaUrls   Json?     @db.JsonB
+
+  lat            Float
+  lng            Float
+  h3Neighborhood String
+
+  // Polymorphic extension — e.g. { offer: { code, expires, discount } }
+  metadata Json? @db.JsonB
+
+  status PostStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([h3Neighborhood, status, createdAt(sort: Desc)])
+  @@index([listingId])
+  @@index([userId])
+}
+
+enum PostType {
+  GENERAL
+  BUSINESS
+  OFFER
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  TEXT_ONLY
+}
+
+enum PostStatus {
+  ACTIVE
+  EXPIRED
+  DELETED
+  REPORTED
+}
