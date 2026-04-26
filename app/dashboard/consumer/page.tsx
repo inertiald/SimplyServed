@@ -2,26 +2,32 @@ import Link from "next/link";
 import { Search, ShoppingBag } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { getWalletSummary } from "@/lib/wallet";
 import { StatusBadge } from "@/components/StatusBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { RequestActions } from "@/components/RequestActions";
+import { WalletCard } from "@/components/WalletCard";
 
 export const dynamic = "force-dynamic";
 
 export default async function ConsumerDashboard() {
   const user = await requireUser();
 
-  const requests = await prisma.serviceRequest.findMany({
-    where: { consumerId: user.id },
-    orderBy: { updatedAt: "desc" },
-    include: {
-      listing: { select: { id: true, title: true, hourlyRate: true, category: true } },
-    },
-    take: 50,
-  });
+  const [requests, wallet] = await Promise.all([
+    prisma.serviceRequest.findMany({
+      where: { consumerId: user.id },
+      orderBy: { updatedAt: "desc" },
+      include: {
+        listing: { select: { id: true, title: true, hourlyRate: true, category: true } },
+      },
+      take: 50,
+    }),
+    getWalletSummary(user.id),
+  ]);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+      <div className="flex flex-col gap-4">
       {requests.length === 0 ? (
         <EmptyState
           icon={ShoppingBag}
@@ -70,6 +76,15 @@ export default async function ConsumerDashboard() {
           })}
         </ul>
       )}
+      </div>
+      <WalletCard
+        consumerBalance={wallet.consumerBalance}
+        providerBalance={wallet.providerBalance}
+        recent={wallet.recent.map((e) => ({
+          ...e,
+          createdAt: e.createdAt.toISOString(),
+        }))}
+      />
     </div>
   );
 }

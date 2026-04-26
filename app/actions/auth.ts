@@ -79,7 +79,10 @@ export async function signUpAction(
     avatarUrl: user.avatarUrl,
   });
 
-  return { ok: true, data: { id: user.id } };
+  // Provider-only signups land on the provider dashboard; everyone else gets
+  // the consumer side as their default home.
+  const next = parsed.data.intent === "provider" ? "/dashboard/provider" : "/dashboard/consumer";
+  return { ok: true, data: { id: user.id, next } };
 }
 
 export async function signInAction(

@@ -111,6 +111,7 @@ async function main() {
   console.log("🌱 Seeding SimplyServed…");
 
   // Wipe existing demo data (idempotent re-runs).
+  await prisma.ledgerEntry.deleteMany();
   await prisma.impression.deleteMany();
   await prisma.post.deleteMany();
   await prisma.serviceRequest.deleteMany();
@@ -124,6 +125,9 @@ async function main() {
         email: u.email,
         name: u.name,
         passwordHash,
+        // Pre-load demo wallets so the booking flow works end-to-end on first run.
+        consumerBalance: u.isConsumer ? 250 : 0,
+        providerBalance: 0,
         consumerProfile: u.isConsumer ? { joinedAs: "consumer" } : undefined,
         providerProfile: u.isProvider
           ? { businessName: u.name, story: "", verified: true }

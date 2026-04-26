@@ -1,6 +1,8 @@
 /**
- * Pluggable platform-fee + payout calculator. Wire to Stripe Connect by
- * implementing this interface elsewhere; the rest of the app stays the same.
+ * Pure fee math — safe to import from client and server. The actual money
+ * movements (wallet, ledger, escrow) live in `lib/wallet.ts`, which is
+ * server-only. Both files are designed to be replaced with Stripe Connect
+ * later without touching anything that calls them.
  */
 export interface FeeBreakdown {
   base: number;
@@ -10,7 +12,7 @@ export interface FeeBreakdown {
   platformFeeBps: number;
 }
 
-const PLATFORM_FEE_BPS = 750; // 7.5%
+export const PLATFORM_FEE_BPS = 750; // 7.5%
 
 export function calculateFees(
   hourlyRate: number,

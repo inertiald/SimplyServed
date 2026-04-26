@@ -25,9 +25,16 @@ model User {
   consumerProfile Json?    @db.JsonB
   providerProfile Json?    @db.JsonB
 
+  // Internal wallet — Stripe-ready abstraction. Stored in dollars.
+  // Two balances so the same account can both spend (consumer) and earn
+  // (provider) without re-pricing the UI for the dual-identity model.
+  consumerBalance Float @default(0)
+  providerBalance Float @default(0)
+
   listings        Listing[]        @relation("ProviderListings")
   serviceRequests ServiceRequest[] @relation("ConsumerRequests")
   posts           Post[]
+  ledgerEntries   LedgerEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -188,4 +195,37 @@ enum PostStatus {
   EXPIRED
   DELETED
   REPORTED
+}
+
+// -----------------------------------------------------------------------------
+// 6. WALLET LEDGER — append-only money movements (Stripe-ready)
+// -----------------------------------------------------------------------------
+// Every balance change is mirrored as a row here so we have a full audit trail
+// and can rebuild balances if needed. `(requestId, kind)` is unique so that
+// payment side-effects in the request workflow are perfectly idempotent — a
+// double-click on "Confirm" or "Complete" can't double-charge.
+model LedgerEntry {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  requestId String?
+  kind      LedgerKind
+  amount    Float   // signed: negative = debit, positive = credit
+  currency  String  @default("USD")
+  memo      String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([requestId, kind])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+enum LedgerKind {
+  TOPUP        // consumer adds funds to wallet (demo "Add $X")
+  HOLD         // consumer → escrow when request is CONFIRMED
+  RELEASE      // escrow → provider when request is COMPLETED
+  FEE          // platform fee taken from the release
+  REFUND       // escrow → consumer when request is CANCELED/DROPPED after hold
+  ADJUSTMENT   // manual adjustment (admin)
 }

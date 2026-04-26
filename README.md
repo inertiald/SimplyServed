@@ -58,7 +58,7 @@ Subsequent starts are instant.
 | Validation           | Zod on every Server Action                                           |
 | Styling              | Tailwind 3, no design system dependency                              |
 | File uploads         | Local disk (dev) — pluggable interface in `lib/storage.ts`           |
-| Payments / payouts   | Pluggable interface in `lib/payments.ts` (Stripe Connect ready)      |
+| Payments / payouts   | Internal wallet + double-entry ledger (`lib/payments.ts`, Stripe-ready) |
 
 ### Data model
 - **User** — single account with optional `consumerProfile` and `providerProfile` JSONB blobs.
@@ -67,6 +67,24 @@ Subsequent starts are instant.
   transitions enforced inside `app/actions/requests.ts`.
 - **Impression** — privacy-preserving reactions (HMAC-bucketed by hour, no user-listing edge stored).
 - **Post** — polymorphic (`GENERAL` / `BUSINESS` / `OFFER`) with media + offer metadata in JSONB.
+- **LedgerEntry** — append-only money movements (`TOPUP` / `HOLD` / `RELEASE` / `FEE` / `REFUND`).
+  Unique `(requestId, kind)` makes payment side-effects idempotent: a double-clicked
+  "Confirm" can't double-charge, and retrying a failed completion can't double-pay out.
+
+### Money flow (MVP wallet)
+```
+Consumer tops up wallet  ──► consumer balance ↑
+Provider responds + schedules
+Consumer CONFIRMs        ──► HOLD: consumer balance ↓ (escrow)
+Provider COMMENCED → STARTED → DELIVERED
+Consumer COMPLETEs       ──► RELEASE: provider balance ↑ (base)
+                              FEE:     platform takes 7.5%
+Anyone CANCELs/DROPs
+  before COMPLETE        ──► REFUND: consumer balance ↑
+```
+`lib/payments.ts` exposes `holdForRequest`, `releaseToProvider`, `refundConsumer`,
+and `fundWallet`. Swap those four function bodies for Stripe PaymentIntents +
+Transfers + Refunds and the rest of the app stays untouched.
 
 ### Realtime fan-out
 ```
