@@ -82,9 +82,11 @@ Consumer COMPLETEs       ──► RELEASE: provider balance ↑ (base)
 Anyone CANCELs/DROPs
   before COMPLETE        ──► REFUND: consumer balance ↑
 ```
-`lib/payments.ts` exposes `holdForRequest`, `releaseToProvider`, `refundConsumer`,
-and `fundWallet`. Swap those four function bodies for Stripe PaymentIntents +
-Transfers + Refunds and the rest of the app stays untouched.
+`lib/wallet.ts` exposes `holdForRequest`, `releaseToProvider`, `refundConsumer`,
+and `fundWallet` (server-only). `lib/payments.ts` keeps only the pure fee math
+so client components can render quotes without pulling Prisma into the bundle.
+Swap those four function bodies for Stripe PaymentIntents + Transfers + Refunds
+and the rest of the app stays untouched.
 
 ### Realtime fan-out
 ```
