@@ -65,7 +65,10 @@ const suggest_price: AgentTool = {
       };
     }
     const rates = rows.map((r) => r.hourlyRate).sort((a, b) => a - b);
-    const median = rates[Math.floor(rates.length / 2)];
+    // Proper median: average of the two middle values for even-length arrays.
+    const mid = Math.floor(rates.length / 2);
+    const median =
+      rates.length % 2 === 0 ? (rates[mid - 1] + rates[mid]) / 2 : rates[mid];
     const p25 = rates[Math.floor(rates.length * 0.25)];
     const p75 = rates[Math.floor(rates.length * 0.75)];
     return {

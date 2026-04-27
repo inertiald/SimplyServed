@@ -80,6 +80,8 @@ export default function NewListingPage() {
       () => undefined,
       { timeout: 5000 },
     );
+    // Mount-only: we do NOT want this to re-run when `coords` later changes
+    // (we'd re-prompt for location after every drag of the lat/lng inputs).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -160,10 +160,20 @@ export async function transitionRequestStatusAction(
   } catch (err) {
     if (err instanceof WalletError) {
       // Roll the status change back so the UI doesn't lie about state.
-      await prisma.serviceRequest.update({
-        where: { id: requestId },
-        data: { status: req.status },
-      });
+      // Wrap in try/catch — a failed rollback leaves DB+wallet inconsistent,
+      // but throwing here would mask the original WalletError from the user.
+      try {
+        await prisma.serviceRequest.update({
+          where: { id: requestId },
+          data: { status: req.status },
+        });
+      } catch (rollbackErr) {
+        console.error(
+          "[requests] status rollback failed after wallet error",
+          { requestId, originalStatus: req.status, attempted: newStatus },
+          rollbackErr,
+        );
+      }
       return { ok: false, error: err.message };
     }
     throw err;

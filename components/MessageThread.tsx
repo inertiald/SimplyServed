@@ -103,6 +103,9 @@ export function MessageThread({
     };
     window.addEventListener("ss:notify", onNotify);
     return () => window.removeEventListener("ss:notify", onNotify);
+    // `messages` / `loading` are intentionally excluded — adding them would
+    // re-subscribe on every refetch, churning the listener. We only care
+    // whether the panel is open and which request id we're scoped to.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, requestId]);
 
