@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { RequestActions } from "@/components/RequestActions";
 import { WalletCard } from "@/components/WalletCard";
+import { MessageThread } from "@/components/MessageThread";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ export default async function ProviderDashboard() {
       include: {
         consumer: { select: { id: true, name: true } },
         listing: { select: { id: true, title: true } },
+        _count: { select: { messages: true } },
       },
     }),
     getWalletSummary(user.id),
@@ -124,6 +126,9 @@ export default async function ProviderDashboard() {
                   </div>
                   <div className="mt-3 border-t border-white/5 pt-3">
                     <RequestActions requestId={r.id} status={r.status} role="provider" />
+                  </div>
+                  <div className="mt-3 border-t border-white/5 pt-3">
+                    <MessageThread requestId={r.id} initialCount={r._count.messages} />
                   </div>
                 </li>
               );

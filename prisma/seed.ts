@@ -114,6 +114,7 @@ async function main() {
   await prisma.ledgerEntry.deleteMany();
   await prisma.impression.deleteMany();
   await prisma.post.deleteMany();
+  await prisma.message.deleteMany();
   await prisma.serviceRequest.deleteMany();
   await prisma.listing.deleteMany();
   await prisma.user.deleteMany();

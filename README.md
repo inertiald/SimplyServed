@@ -91,9 +91,39 @@ and the rest of the app stays untouched.
 ### Realtime fan-out
 ```
 Server Action ── publish ──► Redis ──► /api/realtime SSE ──► Vibe map auto-update
+                                                          └─► NotificationsBell
+                                                          └─► MessageThread (live)
 ```
 The Vibe page subscribes to `vibe:h3:<cell>` channels for the surrounding hex disk
 plus per-user notification channels. New posts pop in instantly.
+
+### 🤖 Local AI agents (Ollama)
+
+Two agents run against a local **llama-3.2:3b** model (small enough for laptop
+CPU, ~1.9 GB on disk). Both use the runner in `lib/agents/runner.ts`, which
+drives a chat-with-tools loop and emits structured SSE events
+(`thought` · `tool` · `tool_result` · `token` · `done`).
+
+| Agent            | Surface                                   | Tools                                          |
+| ---------------- | ----------------------------------------- | ---------------------------------------------- |
+| `concierge`      | `/concierge` chat page                    | `search_listings`, `get_listing`, `draft_request` |
+| `provider_coach` | "✨ Draft with AI" on new-listing page    | `suggest_price`, `draft_listing`, `draft_offer` |
+
+Tools query Postgres directly (e.g. `search_listings` is restricted to the
+caller's H3 ring), so recommendations are actually local. The agent never
+*creates* anything — it only drafts; the human commits in the existing UI.
+
+Bring it up with `docker compose up` (the `ollama-init` companion auto-pulls
+the model on first boot). The Next.js app gracefully falls back when Ollama is
+unreachable, so the rest of the app keeps working without a model.
+
+Override the model with `OLLAMA_MODEL=qwen2.5:3b docker compose up` (any
+Ollama-compatible model with tool-calling support works).
+
+### Vibe Pulse
+The vibe page asks the local LLM for a 1-sentence neighborhood briefing on
+load (`/api/agent/pulse`). With Ollama down it falls back to a deterministic
+counts-based summary.
 
 ---
 

@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { RequestActions } from "@/components/RequestActions";
 import { WalletCard } from "@/components/WalletCard";
+import { MessageThread } from "@/components/MessageThread";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export default async function ConsumerDashboard() {
       orderBy: { updatedAt: "desc" },
       include: {
         listing: { select: { id: true, title: true, hourlyRate: true, category: true } },
+        _count: { select: { messages: true } },
       },
       take: 50,
     }),
@@ -70,6 +72,9 @@ export default async function ConsumerDashboard() {
                     Updated {new Date(r.updatedAt).toLocaleString()}
                   </div>
                   <RequestActions requestId={r.id} status={r.status} role="consumer" />
+                </div>
+                <div className="mt-3 border-t border-white/5 pt-3">
+                  <MessageThread requestId={r.id} initialCount={r._count.messages} />
                 </div>
               </li>
             );

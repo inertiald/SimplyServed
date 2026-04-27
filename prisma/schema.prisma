@@ -35,6 +35,7 @@ model User {
   serviceRequests ServiceRequest[] @relation("ConsumerRequests")
   posts           Post[]
   ledgerEntries   LedgerEntry[]
+  messages        Message[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -102,11 +103,33 @@ model ServiceRequest {
   feeDetails Json @db.JsonB
   metadata   Json? @db.JsonB
 
+  messages   Message[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([consumerId, status])
   @@index([listingId, status])
+}
+
+// -----------------------------------------------------------------------------
+// 3a. MESSAGES — lightweight thread per service request
+// -----------------------------------------------------------------------------
+// Both the consumer and the provider can post to the thread tied to a request.
+// We deliberately don't model arbitrary DMs: every conversation is anchored to
+// a real booking so spam and abuse are inherently scoped.
+model Message {
+  id        String         @id @default(uuid())
+  requestId String
+  request   ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  body      String         @db.Text
+
+  createdAt DateTime       @default(now())
+
+  @@index([requestId, createdAt])
 }
 
 enum RequestStatus {

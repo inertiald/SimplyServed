@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 import { VibeMap } from "@/components/VibeMap";
+import { VibePulse } from "@/components/VibePulse";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,8 @@ export default async function VibePage() {
           Posts and listings around you, indexed by H3 hex cells. Tap a cell to filter.
         </p>
       </header>
+
+      <VibePulse />
 
       <VibeMap
         initialCoords={DEFAULT_COORDS}

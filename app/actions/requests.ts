@@ -170,14 +170,20 @@ export async function transitionRequestStatusAction(
   }
 
   await safePublish(`notify:user:${req.consumerId}`, {
+    kind: "request",
     type: "request.updated",
     requestId,
     status: newStatus,
+    preview: `Status changed to ${newStatus}`,
+    at: new Date().toISOString(),
   });
   await safePublish(`notify:provider:${req.listing.providerId}`, {
+    kind: "request",
     type: "request.updated",
     requestId,
     status: newStatus,
+    preview: `Status changed to ${newStatus}`,
+    at: new Date().toISOString(),
   });
 
   revalidatePath("/dashboard/consumer");

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { signOutAction } from "@/app/actions/auth";
 import type { SessionUser } from "@/lib/auth";
+import { NotificationsBell } from "@/components/NotificationsBell";
 
 export function Header({ user }: { user: SessionUser | null }) {
   return (
@@ -41,6 +42,7 @@ export function Header({ user }: { user: SessionUser | null }) {
         <div className="flex items-center gap-2">
           {user ? (
             <>
+              <NotificationsBell />
               <span className="hidden text-sm text-white/70 sm:inline">{user.name}</span>
               <form action={signOutAction}>
                 <button className="ss-btn-ghost text-xs">Sign out</button>
