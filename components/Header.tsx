@@ -15,6 +15,13 @@ export function Header({ user }: { user: SessionUser | null }) {
         </Link>
 
         <nav className="hidden items-center gap-1 text-sm text-white/70 md:flex">
+          <Link
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-fuchsia-200 hover:bg-white/5"
+            href="/concierge"
+          >
+            <Sparkles size={12} className="text-fuchsia-300" />
+            Concierge
+          </Link>
           <Link className="rounded-lg px-3 py-1.5 hover:bg-white/5 hover:text-white" href="/vibe">
             Vibe
           </Link>

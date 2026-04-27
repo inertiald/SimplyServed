@@ -17,12 +17,16 @@ services:
     environment:
       DATABASE_URL: postgresql://simplyserved:simplyserved@db:5432/simplyserved?schema=public
       REDIS_URL: redis://redis:6379
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
       AUTH_SECRET: ${AUTH_SECRET:-dev-only-secret-please-change-me-aaaaaaaaaaaaaaaa}
       NODE_ENV: production
     depends_on:
       db:
         condition: service_healthy
       redis:
+        condition: service_started
+      ollama:
         condition: service_started
     command: sh -c "chmod +x scripts/entrypoint.sh && ./scripts/entrypoint.sh && npm run start"
     restart: unless-stopped
@@ -53,7 +57,40 @@ services:
       - redis_data:/data
     restart: unless-stopped
 
+  # ---------------------------------------------------------------------------
+  # Local LLM. Runs llama3.2:3b — small enough for laptop CPU, fast enough for
+  # an interactive concierge. The `ollama-init` companion pulls the model on
+  # first boot so the demo is truly one-command. The Next.js app gracefully
+  # degrades when Ollama is unreachable, so this service is optional.
+  # ---------------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+  ollama-init:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_started
+    entrypoint: ["/bin/sh", "-c"]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
+    command:
+      - |
+        echo "▶ Waiting for Ollama…"
+        until ollama list >/dev/null 2>&1; do sleep 1; done
+        echo "▶ Pulling $$OLLAMA_MODEL (first run only)…"
+        ollama pull "$$OLLAMA_MODEL"
+        echo "✓ Model ready."
+    restart: "no"
+
 volumes:
   postgres_data:
   redis_data:
   uploads_data:
+  ollama_data:
