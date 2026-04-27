@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bell, Check } from "lucide-react";
+import { toast } from "@/components/Toaster";
 
 interface Notification {
   id: string;
@@ -60,6 +61,14 @@ export function NotificationsBell() {
         setItems((prev) => [note, ...prev].slice(0, 20));
         // Re-broadcast for other components that care about live updates.
         window.dispatchEvent(new CustomEvent("ss:notify", { detail: p }));
+        // Passive toast — gives the user a heads-up without forcing them
+        // to open the bell.
+        toast({
+          title: note.from
+            ? `${labelFor(note.kind)} · ${note.from}`
+            : labelFor(note.kind),
+          tone: note.kind === "review" ? "success" : "info",
+        });
       } catch {
         /* ignore */
       }
@@ -176,6 +185,8 @@ function labelFor(kind: string): string {
     case "request":
     case "request.updated":
       return "Booking update";
+    case "review":
+      return "New review";
     default:
       return kind.charAt(0).toUpperCase() + kind.slice(1);
   }

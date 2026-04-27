@@ -28,10 +28,10 @@ export default async function ListingsPage({
 
   const listings = await prisma.listing.findMany({
     where,
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ ratingAvg: "desc" }, { createdAt: "desc" }],
     take: 60,
     include: {
-      provider: { select: { name: true, avatarUrl: true } },
+      provider: { select: { id: true, name: true, avatarUrl: true } },
       _count: { select: { impressions: true, requests: true } },
     },
   });

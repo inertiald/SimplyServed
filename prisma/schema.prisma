@@ -36,6 +36,8 @@ model User {
   posts           Post[]
   ledgerEntries   LedgerEntry[]
   messages        Message[]
+  reviewsAuthored Review[]         @relation("ReviewsAuthored")
+  reviewsReceived Review[]         @relation("ReviewsReceived")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -69,9 +71,15 @@ model Listing {
 
   status ListingStatus @default(ACTIVE)
 
+  // Denormalized review aggregates so list/discover queries stay one round-trip.
+  // Recomputed inside the same transaction as Review create/update/delete.
+  ratingAvg   Float @default(0)
+  ratingCount Int   @default(0)
+
   requests    ServiceRequest[]
   impressions Impression[]
   posts       Post[]
+  reviews     Review[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -104,12 +112,40 @@ model ServiceRequest {
   metadata   Json? @db.JsonB
 
   messages   Message[]
+  review     Review?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([consumerId, status])
   @@index([listingId, status])
+}
+
+// -----------------------------------------------------------------------------
+// 3b. REVIEWS — one per completed request, mutual trust loop
+// -----------------------------------------------------------------------------
+// We anchor reviews on `ServiceRequest` (1:1) so every review is provably tied
+// to a real, completed booking — not a freeform rating-bomb. Aggregates are
+// denormalized onto Listing for cheap discover/listing-card rendering.
+model Review {
+  id         String         @id @default(uuid())
+  requestId  String         @unique
+  request    ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  listingId  String
+  listing    Listing        @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User           @relation("ReviewsAuthored", fields: [authorId], references: [id], onDelete: Cascade)
+  providerId String
+  provider   User           @relation("ReviewsReceived", fields: [providerId], references: [id], onDelete: Cascade)
+
+  rating     Int            // 1..5 (validated in the action)
+  body       String?        @db.Text
+
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@index([listingId, createdAt])
+  @@index([providerId, createdAt])
 }
 
 // -----------------------------------------------------------------------------

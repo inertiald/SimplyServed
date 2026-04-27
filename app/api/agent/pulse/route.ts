@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { neighborhoodCellsAround } from "@/lib/h3";
 import { chat, isOllamaAvailable } from "@/lib/ollama";
+import { rateLimit, rateLimitHeaders } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -18,6 +19,19 @@ export async function GET(request: Request) {
   const lng = Number(searchParams.get("lng") ?? "");
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     return Response.json({ error: "Missing lat/lng" }, { status: 400 });
+  }
+
+  // 30 calls/min/IP — generous for a page-load summary, mean for an attacker.
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
+    request.headers.get("x-real-ip") ||
+    "anon";
+  const rl = await rateLimit(`pulse:ip:${ip}`, 30, 60);
+  if (!rl.allowed) {
+    return Response.json(
+      { error: "Rate limited" },
+      { status: 429, headers: rateLimitHeaders(rl) },
+    );
   }
 
   const cells = neighborhoodCellsAround(lat, lng, 2);

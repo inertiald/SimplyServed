@@ -8,6 +8,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { RequestActions } from "@/components/RequestActions";
 import { WalletCard } from "@/components/WalletCard";
 import { MessageThread } from "@/components/MessageThread";
+import { ReviewForm } from "@/components/ReviewForm";
+import { RatingStars } from "@/components/RatingStars";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,7 @@ export default async function ConsumerDashboard() {
       orderBy: { updatedAt: "desc" },
       include: {
         listing: { select: { id: true, title: true, hourlyRate: true, category: true } },
+        review: { select: { rating: true, body: true } },
         _count: { select: { messages: true } },
       },
       take: 50,
@@ -76,6 +79,44 @@ export default async function ConsumerDashboard() {
                 <div className="mt-3 border-t border-white/5 pt-3">
                   <MessageThread requestId={r.id} initialCount={r._count.messages} />
                 </div>
+                {r.status === "COMPLETED" && (
+                  <div className="mt-3 border-t border-white/5 pt-3">
+                    {r.review ? (
+                      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <span className="font-medium text-emerald-200">
+                            Your review
+                          </span>
+                          <RatingStars value={r.review.rating} size={11} showCount={false} />
+                        </div>
+                        {r.review.body && (
+                          <p className="mt-1 text-xs text-white/70">{r.review.body}</p>
+                        )}
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-[11px] text-white/50 hover:text-white/80">
+                            Edit
+                          </summary>
+                          <div className="mt-2">
+                            <ReviewForm
+                              requestId={r.id}
+                              initialRating={r.review.rating}
+                              initialBody={r.review.body ?? ""}
+                            />
+                          </div>
+                        </details>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+                        <div className="text-xs font-medium text-amber-200">
+                          How was it? Leave a review
+                        </div>
+                        <div className="mt-2">
+                          <ReviewForm requestId={r.id} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </li>
             );
           })}

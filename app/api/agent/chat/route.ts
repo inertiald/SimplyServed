@@ -2,6 +2,7 @@ import { runAgent, type AgentEvent } from "@/lib/agents/runner";
 import { conciergeAgent } from "@/lib/agents/concierge";
 import { providerCoachAgent } from "@/lib/agents/provider_coach";
 import { getSessionUser } from "@/lib/auth";
+import { rateLimit, rateLimitHeaders } from "@/lib/rateLimit";
 import type { ChatMessage } from "@/lib/ollama";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +51,25 @@ export async function POST(request: Request) {
   const user = await getSessionUser();
   if (agent.id === "provider_coach" && !user) {
     return new Response("Sign in required", { status: 401 });
+  }
+
+  // Rate limit: 10 agent runs / minute / user (or per-IP for anonymous
+  // concierge sessions). LLM inference is expensive even on the local box;
+  // this protects the model and the DB from a single chatty client.
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
+    request.headers.get("x-real-ip") ||
+    "anon";
+  const rlKey = `agent:${user?.id ?? `ip:${ip}`}`;
+  const rl = await rateLimit(rlKey, 10, 60);
+  if (!rl.allowed) {
+    return new Response("Slow down — too many agent calls. Try again in a moment.", {
+      status: 429,
+      headers: {
+        "Content-Type": "text/plain",
+        ...rateLimitHeaders(rl),
+      },
+    });
   }
 
   const ctx = {
@@ -119,6 +139,7 @@ export async function POST(request: Request) {
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
       "X-Accel-Buffering": "no",
+      ...rateLimitHeaders(rl),
     },
   });
 }

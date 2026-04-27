@@ -12,6 +12,7 @@ import {
   Zap,
 } from "lucide-react";
 import type { AgentEvent } from "@/lib/agents/runner";
+import { toast } from "@/components/Toaster";
 
 interface ListingHit {
   id: string;
@@ -149,7 +150,11 @@ export function ConciergeChat({
           signal: ctrl.signal,
         });
         if (!res.ok || !res.body) {
-          throw new Error(await res.text().catch(() => res.statusText));
+          const txt = await res.text().catch(() => res.statusText);
+          if (res.status === 429) {
+            toast({ title: txt || "Slow down a moment.", tone: "info" });
+          }
+          throw new Error(txt);
         }
 
         const reader = res.body.getReader();
