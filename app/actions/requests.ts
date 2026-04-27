@@ -5,6 +5,12 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { calculateFees } from "@/lib/payments";
+import {
+  holdForRequest,
+  releaseToProvider,
+  refundConsumer,
+  WalletError,
+} from "@/lib/wallet";
 import { safePublish } from "@/lib/redis";
 import type { RequestStatus } from "@prisma/client";
 import type { ActionResult } from "./auth";
@@ -116,15 +122,78 @@ export async function transitionRequestStatusAction(
     data: { status: newStatus },
   });
 
+  // -------------------------------------------------------------------------
+  // Money side-effects. All wallet primitives are idempotent on requestId so
+  // re-firing a transition (or retrying after an error) is safe.
+  // -------------------------------------------------------------------------
+  const fees = (req.feeDetails ?? {}) as {
+    base?: number;
+    platformFee?: number;
+    total?: number;
+  };
+  try {
+    if (newStatus === "CONFIRMED" && typeof fees.total === "number") {
+      await holdForRequest({
+        requestId,
+        consumerId: req.consumerId,
+        total: fees.total,
+      });
+    } else if (
+      newStatus === "COMPLETED" &&
+      typeof fees.base === "number" &&
+      typeof fees.platformFee === "number"
+    ) {
+      await releaseToProvider({
+        requestId,
+        consumerId: req.consumerId,
+        providerId: req.listing.providerId,
+        base: fees.base,
+        platformFee: fees.platformFee,
+      });
+    } else if (newStatus === "CANCELED" || newStatus === "DROPPED") {
+      // Best-effort refund. No-op if no hold exists or if already released.
+      await refundConsumer({
+        requestId,
+        consumerId: req.consumerId,
+      });
+    }
+  } catch (err) {
+    if (err instanceof WalletError) {
+      // Roll the status change back so the UI doesn't lie about state.
+      // Wrap in try/catch — a failed rollback leaves DB+wallet inconsistent,
+      // but throwing here would mask the original WalletError from the user.
+      try {
+        await prisma.serviceRequest.update({
+          where: { id: requestId },
+          data: { status: req.status },
+        });
+      } catch (rollbackErr) {
+        console.error(
+          "[requests] status rollback failed after wallet error",
+          { requestId, originalStatus: req.status, attempted: newStatus },
+          rollbackErr,
+        );
+      }
+      return { ok: false, error: err.message };
+    }
+    throw err;
+  }
+
   await safePublish(`notify:user:${req.consumerId}`, {
+    kind: "request",
     type: "request.updated",
     requestId,
     status: newStatus,
+    preview: `Status changed to ${newStatus}`,
+    at: new Date().toISOString(),
   });
   await safePublish(`notify:provider:${req.listing.providerId}`, {
+    kind: "request",
     type: "request.updated",
     requestId,
     status: newStatus,
+    preview: `Status changed to ${newStatus}`,
+    at: new Date().toISOString(),
   });
 
   revalidatePath("/dashboard/consumer");

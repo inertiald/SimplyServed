@@ -14,7 +14,10 @@ export default function SignUpPage() {
   );
 
   useEffect(() => {
-    if (state?.ok) router.push("/dashboard");
+    if (state?.ok) {
+      const next = (state.data as { next?: string } | null)?.next ?? "/dashboard";
+      router.push(next);
+    }
   }, [state, router]);
 
   const fe = (state && !state.ok && state.fieldErrors) || {};

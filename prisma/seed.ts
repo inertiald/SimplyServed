@@ -111,8 +111,11 @@ async function main() {
   console.log("🌱 Seeding SimplyServed…");
 
   // Wipe existing demo data (idempotent re-runs).
+  await prisma.ledgerEntry.deleteMany();
   await prisma.impression.deleteMany();
   await prisma.post.deleteMany();
+  await prisma.message.deleteMany();
+  await prisma.review.deleteMany();
   await prisma.serviceRequest.deleteMany();
   await prisma.listing.deleteMany();
   await prisma.user.deleteMany();
@@ -124,6 +127,9 @@ async function main() {
         email: u.email,
         name: u.name,
         passwordHash,
+        // Pre-load demo wallets so the booking flow works end-to-end on first run.
+        consumerBalance: u.isConsumer ? 250 : 0,
+        providerBalance: 0,
         consumerProfile: u.isConsumer ? { joinedAs: "consumer" } : undefined,
         providerProfile: u.isProvider
           ? { businessName: u.name, story: "", verified: true }
@@ -208,6 +214,71 @@ async function main() {
         h3Neighborhood: latLngToCell(lat, lng, RES_NEIGHBORHOOD),
       },
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Seed a small history of completed bookings + reviews so the discover UI
+  // and provider profiles light up out of the box.
+  // ---------------------------------------------------------------------------
+  const consumerForReviews = carlos; // already fetched above
+  if (consumerForReviews) {
+    const featured = await prisma.listing.findMany({
+      where: { providerId: { not: consumerForReviews.id } },
+      take: 6,
+      orderBy: { createdAt: "asc" },
+    });
+    const sampleReviews = [
+      { rating: 5, body: "Showed up early, super pro. Will rebook." },
+      { rating: 5, body: "Made my whole block jealous. 10/10." },
+      { rating: 4, body: "Solid work — would recommend to a neighbor." },
+      { rating: 5, body: "Friendly, clean, and on time. Exactly what I hoped." },
+      { rating: 4, body: null as string | null },
+      { rating: 5, body: "Best $$$ I've spent this month." },
+    ];
+    for (let i = 0; i < featured.length; i++) {
+      const l = featured[i];
+      const sample = sampleReviews[i % sampleReviews.length];
+      const fees = {
+        base: l.hourlyRate,
+        platformFee: Math.round(l.hourlyRate * 0.075 * 100) / 100,
+        total: Math.round(l.hourlyRate * 1.075 * 100) / 100,
+        hours: 1,
+      };
+      const req = await prisma.serviceRequest.create({
+        data: {
+          consumerId: consumerForReviews.id,
+          listingId: l.id,
+          status: "COMPLETED",
+          feeDetails: fees,
+          scheduledDate: new Date(Date.now() - (i + 2) * 24 * 60 * 60 * 1000),
+        },
+      });
+      await prisma.review.create({
+        data: {
+          requestId: req.id,
+          listingId: l.id,
+          authorId: consumerForReviews.id,
+          providerId: l.providerId,
+          rating: sample.rating,
+          body: sample.body,
+        },
+      });
+    }
+    // Recompute aggregates for the listings we just touched.
+    for (const l of featured) {
+      const agg = await prisma.review.aggregate({
+        where: { listingId: l.id },
+        _avg: { rating: true },
+        _count: { _all: true },
+      });
+      await prisma.listing.update({
+        where: { id: l.id },
+        data: {
+          ratingAvg: Math.round((agg._avg.rating ?? 0) * 10) / 10,
+          ratingCount: agg._count._all,
+        },
+      });
+    }
   }
 
   console.log("✅ Seed complete.");

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Header } from "@/components/Header";
+import { Toaster } from "@/components/Toaster";
 import { getSessionUser } from "@/lib/auth";
 
 export const metadata: Metadata = {
@@ -22,6 +23,7 @@ export default async function RootLayout({
         <main className="mx-auto w-full max-w-7xl px-4 pb-24 pt-6 sm:px-6">
           {children}
         </main>
+        <Toaster />
       </body>
     </html>
   );

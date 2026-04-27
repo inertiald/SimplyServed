@@ -25,9 +25,19 @@ model User {
   consumerProfile Json?    @db.JsonB
   providerProfile Json?    @db.JsonB
 
+  // Internal wallet — Stripe-ready abstraction. Stored in dollars.
+  // Two balances so the same account can both spend (consumer) and earn
+  // (provider) without re-pricing the UI for the dual-identity model.
+  consumerBalance Float @default(0)
+  providerBalance Float @default(0)
+
   listings        Listing[]        @relation("ProviderListings")
   serviceRequests ServiceRequest[] @relation("ConsumerRequests")
   posts           Post[]
+  ledgerEntries   LedgerEntry[]
+  messages        Message[]
+  reviewsAuthored Review[]         @relation("ReviewsAuthored")
+  reviewsReceived Review[]         @relation("ReviewsReceived")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -61,9 +71,15 @@ model Listing {
 
   status ListingStatus @default(ACTIVE)
 
+  // Denormalized review aggregates so list/discover queries stay one round-trip.
+  // Recomputed inside the same transaction as Review create/update/delete.
+  ratingAvg   Float @default(0)
+  ratingCount Int   @default(0)
+
   requests    ServiceRequest[]
   impressions Impression[]
   posts       Post[]
+  reviews     Review[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -95,11 +111,61 @@ model ServiceRequest {
   feeDetails Json @db.JsonB
   metadata   Json? @db.JsonB
 
+  messages   Message[]
+  review     Review?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([consumerId, status])
   @@index([listingId, status])
+}
+
+// -----------------------------------------------------------------------------
+// 3b. REVIEWS — one per completed request, mutual trust loop
+// -----------------------------------------------------------------------------
+// We anchor reviews on `ServiceRequest` (1:1) so every review is provably tied
+// to a real, completed booking — not a freeform rating-bomb. Aggregates are
+// denormalized onto Listing for cheap discover/listing-card rendering.
+model Review {
+  id         String         @id @default(uuid())
+  requestId  String         @unique
+  request    ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  listingId  String
+  listing    Listing        @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User           @relation("ReviewsAuthored", fields: [authorId], references: [id], onDelete: Cascade)
+  providerId String
+  provider   User           @relation("ReviewsReceived", fields: [providerId], references: [id], onDelete: Cascade)
+
+  rating     Int            // 1..5 (validated in the action)
+  body       String?        @db.Text
+
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@index([listingId, createdAt])
+  @@index([providerId, createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// 3a. MESSAGES — lightweight thread per service request
+// -----------------------------------------------------------------------------
+// Both the consumer and the provider can post to the thread tied to a request.
+// We deliberately don't model arbitrary DMs: every conversation is anchored to
+// a real booking so spam and abuse are inherently scoped.
+model Message {
+  id        String         @id @default(uuid())
+  requestId String
+  request   ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  body      String         @db.Text
+
+  createdAt DateTime       @default(now())
+
+  @@index([requestId, createdAt])
 }
 
 enum RequestStatus {
@@ -188,4 +254,37 @@ enum PostStatus {
   EXPIRED
   DELETED
   REPORTED
+}
+
+// -----------------------------------------------------------------------------
+// 6. WALLET LEDGER — append-only money movements (Stripe-ready)
+// -----------------------------------------------------------------------------
+// Every balance change is mirrored as a row here so we have a full audit trail
+// and can rebuild balances if needed. `(requestId, kind)` is unique so that
+// payment side-effects in the request workflow are perfectly idempotent — a
+// double-click on "Confirm" or "Complete" can't double-charge.
+model LedgerEntry {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  requestId String?
+  kind      LedgerKind
+  amount    Float   // signed: negative = debit, positive = credit
+  currency  String  @default("USD")
+  memo      String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([requestId, kind])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+enum LedgerKind {
+  TOPUP        // consumer adds funds to wallet (demo "Add $X")
+  HOLD         // consumer → escrow when request is CONFIRMED
+  RELEASE      // escrow → provider when request is COMPLETED
+  FEE          // platform fee taken from the release
+  REFUND       // escrow → consumer when request is CANCELED/DROPPED after hold
+  ADJUSTMENT   // manual adjustment (admin)
 }

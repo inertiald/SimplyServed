@@ -45,17 +45,22 @@ export async function createListingAction(
       lng: geo.lng,
       h3City: geo.h3City,
       h3Neighborhood: geo.h3Neighborhood,
-      // Auto-promote provider profile so dashboard reflects activity.
     },
   });
 
-  // Make sure the user has a provider profile blob.
+  // Make sure the user has a provider profile blob (without clobbering
+  // anything they may have already set).
+  const me = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { providerProfile: true },
+  });
+  const existing = (me?.providerProfile ?? {}) as Record<string, unknown>;
   await prisma.user.update({
     where: { id: user.id },
     data: {
       providerProfile: {
-        businessName: user.name,
-        listings: { increment: 1 },
+        ...existing,
+        businessName: existing.businessName ?? user.name,
       } as object,
     },
   });

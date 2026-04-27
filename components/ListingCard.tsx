@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MapPin, Heart, Briefcase } from "lucide-react";
+import { RatingStars } from "@/components/RatingStars";
 
 export interface ListingCardData {
   id: string;
@@ -7,7 +8,9 @@ export interface ListingCardData {
   description: string;
   category: string;
   hourlyRate: number;
-  provider: { name: string; avatarUrl: string | null };
+  ratingAvg?: number;
+  ratingCount?: number;
+  provider: { id?: string; name: string; avatarUrl: string | null };
   _count?: { impressions: number; requests: number };
 }
 
@@ -35,15 +38,24 @@ export function ListingCard({ listing }: { listing: ListingCardData }) {
         <p className="mt-1 line-clamp-2 text-sm text-white/60">{listing.description}</p>
       </div>
 
-      <div className="mt-auto flex items-center justify-between text-xs text-white/50">
+      <div className="mt-auto flex items-center justify-between gap-2 text-xs text-white/50">
         <span className="flex items-center gap-1.5">
           <MapPin size={12} /> {listing.provider.name}
         </span>
-        {listing._count && (
-          <span className="flex items-center gap-1.5">
-            <Heart size={12} /> {listing._count.impressions}
-          </span>
-        )}
+        <span className="flex items-center gap-2">
+          {typeof listing.ratingAvg === "number" && (listing.ratingCount ?? 0) > 0 && (
+            <RatingStars
+              value={listing.ratingAvg}
+              count={listing.ratingCount}
+              size={11}
+            />
+          )}
+          {listing._count && (
+            <span className="flex items-center gap-1">
+              <Heart size={12} /> {listing._count.impressions}
+            </span>
+          )}
+        </span>
       </div>
     </Link>
   );

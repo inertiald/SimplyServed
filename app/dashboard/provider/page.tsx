@@ -2,16 +2,19 @@ import Link from "next/link";
 import { Plus, Briefcase } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { getWalletSummary } from "@/lib/wallet";
 import { StatusBadge } from "@/components/StatusBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { RequestActions } from "@/components/RequestActions";
+import { WalletCard } from "@/components/WalletCard";
+import { MessageThread } from "@/components/MessageThread";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProviderDashboard() {
   const user = await requireUser();
 
-  const [listings, requests] = await Promise.all([
+  const [listings, requests, wallet] = await Promise.all([
     prisma.listing.findMany({
       where: { providerId: user.id },
       orderBy: { createdAt: "desc" },
@@ -24,12 +27,24 @@ export default async function ProviderDashboard() {
       include: {
         consumer: { select: { id: true, name: true } },
         listing: { select: { id: true, title: true } },
+        _count: { select: { messages: true } },
       },
     }),
+    getWalletSummary(user.id),
   ]);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
+    <div className="flex flex-col gap-6">
+      <WalletCard
+        consumerBalance={wallet.consumerBalance}
+        providerBalance={wallet.providerBalance}
+        recent={wallet.recent.map((e) => ({
+          ...e,
+          createdAt: e.createdAt.toISOString(),
+        }))}
+        showProvider
+      />
+      <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
       {/* LISTINGS */}
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
@@ -112,12 +127,16 @@ export default async function ProviderDashboard() {
                   <div className="mt-3 border-t border-white/5 pt-3">
                     <RequestActions requestId={r.id} status={r.status} role="provider" />
                   </div>
+                  <div className="mt-3 border-t border-white/5 pt-3">
+                    <MessageThread requestId={r.id} initialCount={r._count.messages} />
+                  </div>
                 </li>
               );
             })}
           </ul>
         )}
       </section>
+      </div>
     </div>
   );
 }

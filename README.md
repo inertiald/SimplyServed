@@ -58,7 +58,7 @@ Subsequent starts are instant.
 | Validation           | Zod on every Server Action                                           |
 | Styling              | Tailwind 3, no design system dependency                              |
 | File uploads         | Local disk (dev) — pluggable interface in `lib/storage.ts`           |
-| Payments / payouts   | Pluggable interface in `lib/payments.ts` (Stripe Connect ready)      |
+| Payments / payouts   | Internal wallet + double-entry ledger (`lib/payments.ts`, Stripe-ready) |
 
 ### Data model
 - **User** — single account with optional `consumerProfile` and `providerProfile` JSONB blobs.
@@ -67,13 +67,63 @@ Subsequent starts are instant.
   transitions enforced inside `app/actions/requests.ts`.
 - **Impression** — privacy-preserving reactions (HMAC-bucketed by hour, no user-listing edge stored).
 - **Post** — polymorphic (`GENERAL` / `BUSINESS` / `OFFER`) with media + offer metadata in JSONB.
+- **LedgerEntry** — append-only money movements (`TOPUP` / `HOLD` / `RELEASE` / `FEE` / `REFUND`).
+  Unique `(requestId, kind)` makes payment side-effects idempotent: a double-clicked
+  "Confirm" can't double-charge, and retrying a failed completion can't double-pay out.
+
+### Money flow (MVP wallet)
+```
+Consumer tops up wallet  ──► consumer balance ↑
+Provider responds + schedules
+Consumer CONFIRMs        ──► HOLD: consumer balance ↓ (escrow)
+Provider COMMENCED → STARTED → DELIVERED
+Consumer COMPLETEs       ──► RELEASE: provider balance ↑ (base)
+                              FEE:     platform takes 7.5%
+Anyone CANCELs/DROPs
+  before COMPLETE        ──► REFUND: consumer balance ↑
+```
+`lib/wallet.ts` exposes `holdForRequest`, `releaseToProvider`, `refundConsumer`,
+and `fundWallet` (server-only). `lib/payments.ts` keeps only the pure fee math
+so client components can render quotes without pulling Prisma into the bundle.
+Swap those four function bodies for Stripe PaymentIntents + Transfers + Refunds
+and the rest of the app stays untouched.
 
 ### Realtime fan-out
 ```
 Server Action ── publish ──► Redis ──► /api/realtime SSE ──► Vibe map auto-update
+                                                          └─► NotificationsBell
+                                                          └─► MessageThread (live)
 ```
 The Vibe page subscribes to `vibe:h3:<cell>` channels for the surrounding hex disk
 plus per-user notification channels. New posts pop in instantly.
+
+### 🤖 Local AI agents (Ollama)
+
+Two agents run against a local **llama-3.2:3b** model (small enough for laptop
+CPU, ~1.9 GB on disk). Both use the runner in `lib/agents/runner.ts`, which
+drives a chat-with-tools loop and emits structured SSE events
+(`thought` · `tool` · `tool_result` · `token` · `done`).
+
+| Agent            | Surface                                   | Tools                                          |
+| ---------------- | ----------------------------------------- | ---------------------------------------------- |
+| `concierge`      | `/concierge` chat page                    | `search_listings`, `get_listing`, `draft_request` |
+| `provider_coach` | "✨ Draft with AI" on new-listing page    | `suggest_price`, `draft_listing`, `draft_offer` |
+
+Tools query Postgres directly (e.g. `search_listings` is restricted to the
+caller's H3 ring), so recommendations are actually local. The agent never
+*creates* anything — it only drafts; the human commits in the existing UI.
+
+Bring it up with `docker compose up` (the `ollama-init` companion auto-pulls
+the model on first boot). The Next.js app gracefully falls back when Ollama is
+unreachable, so the rest of the app keeps working without a model.
+
+Override the model with `OLLAMA_MODEL=qwen2.5:3b docker compose up` (any
+Ollama-compatible model with tool-calling support works).
+
+### Vibe Pulse
+The vibe page asks the local LLM for a 1-sentence neighborhood briefing on
+load (`/api/agent/pulse`). With Ollama down it falls back to a deterministic
+counts-based summary.
 
 ---
 
