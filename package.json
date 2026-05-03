@@ -11,6 +11,7 @@
     "prisma:migrate": "prisma migrate deploy",
     "prisma:push": "prisma db push --skip-generate --accept-data-loss",
     "prisma:seed": "tsx prisma/seed.ts",
+    "simulate": "tsx scripts/simulate.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {
