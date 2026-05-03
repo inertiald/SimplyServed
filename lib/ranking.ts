@@ -62,12 +62,13 @@ const W = {
 } as const;
 
 /**
- * Recency decay: exponential with a half-life of ~48 h.
- * New content (0 h old) → 1.0; 48 h old → 0.5; 1 week → ~0.1.
+ * Recency decay: exponential with a half-life of ~69 h.
+ * New content (0 h old) → 1.0; 69 h old → 0.5; 1 week → ~0.16.
+ * Constant = ln(2) × 100.
  */
 function recencyScore(createdAt: Date): number {
   const ageHours = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
-  return Math.exp(-ageHours / 69.3); // 69.3 ≈ ln(2) * 100 → half-life 69.3 h
+  return Math.exp(-ageHours / 69.3); // half-life ≈ 69.3 h (ln2 × 100)
 }
 
 /**

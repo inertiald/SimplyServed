@@ -35,9 +35,10 @@ function randomHash(): string {
   return crypto.randomBytes(32).toString("hex");
 }
 
-/** Pick a random element from a non-empty array. */
+/** Pick a random element from a non-empty array. Not for cryptographic use — dev simulation only. */
 function pick<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)] as T;
+  // Math.random() is intentional here: this is a non-security dev simulation helper.
+  return arr[Math.floor(Math.random() * arr.length)] as T; // nosec
 }
 
 const COMMUNITY_POSTS = [

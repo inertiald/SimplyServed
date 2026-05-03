@@ -485,11 +485,13 @@ async function main() {
   }
 
   // ── Impressions (simulate varied popularity) ───────────────────────────────
-  // Hot listings: first third get many impressions; last third get few.
+  // Tier boundaries: first third = hot, middle third = mid, last third = cold.
   const reactions: Reaction[] = [Reaction.LIKE, Reaction.LOVE, Reaction.WOW];
+  const HOT_TIER_THRESHOLD = Math.floor(allListings.length / 3);
+  const MID_TIER_THRESHOLD = Math.floor((allListings.length * 2) / 3);
   for (let i = 0; i < allListings.length; i++) {
     const l = allListings[i];
-    const tier = i < allListings.length / 3 ? "hot" : i < (allListings.length * 2) / 3 ? "mid" : "cold";
+    const tier = i < HOT_TIER_THRESHOLD ? "hot" : i < MID_TIER_THRESHOLD ? "mid" : "cold";
     const count = tier === "hot" ? randInt(40, 120) : tier === "mid" ? randInt(8, 40) : randInt(0, 8);
     for (let j = 0; j < count; j++) {
       const reaction = reactions[j % reactions.length];
