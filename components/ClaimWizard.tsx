@@ -106,7 +106,9 @@ export function ClaimWizard(props: ClaimWizardProps) {
         <form action={submitAction} className="ss-card flex flex-col gap-3 p-5">
           <input type="hidden" name="claimId" value={claimId} />
           <h2 className="text-base font-semibold text-white">3. Enter the code</h2>
+          <label className="ss-label" htmlFor="claim-otp">Verification code</label>
           <input
+            id="claim-otp"
             name="code"
             inputMode="numeric"
             placeholder="6-digit code"
@@ -132,7 +134,9 @@ export function ClaimWizard(props: ClaimWizardProps) {
             Paste a URL to a publicly-accessible document (business license,
             utility bill, EIN letter). An admin will review.
           </p>
+          <label className="ss-label" htmlFor="claim-doc-url">Document URL</label>
           <input
+            id="claim-doc-url"
             name="docUrl"
             type="url"
             placeholder="https://…"

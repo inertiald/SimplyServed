@@ -7,12 +7,14 @@
  *   2. Stream the body to local storage via the same pluggable path as user
  *      uploads (`public/uploads/...`). Production deployments can swap this
  *      for S3/GCS by re-binding `lib/storage.ts`.
- *   3. Compute a perceptual-ish hash so the unique `(profileId, phash)`
- *      index in Prisma blocks dupes on re-scrapes.
+ *   3. Compute a content hash so the unique `(profileId, phash)` index in
+ *      Prisma blocks dupes on re-scrapes.
  *
- * For pHash we use a SHA-256 over a normalized byte sample — it's content-
- * hashing, not true perceptual hashing, but it correctly catches identical
- * downloads (the most common dupe case) without a native dependency.
+ * For the `phash` column we use a SHA-256 over the raw bytes — that's
+ * content-hashing, NOT true perceptual hashing. It correctly catches
+ * byte-identical downloads (the most common dupe case on re-scrapes) but
+ * won't catch visually-similar re-encoded images. A future iteration can
+ * swap in a real perceptual hash (e.g. blockhash-js) behind this same API.
  */
 import path from "node:path";
 import { promises as fs } from "node:fs";

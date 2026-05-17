@@ -33,6 +33,8 @@ function genCode(): string {
   return String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
 }
 
+const OTP_TTL_MS = 15 * 60 * 1000;
+
 function hashCode(code: string): string {
   return crypto.createHash("sha256").update(code).digest("hex");
 }
@@ -175,7 +177,13 @@ export async function submitVerificationAction(
 
   // EMAIL_DOMAIN / PHONE_OTP — match the OTP.
   if (!parsed.data.code) return { ok: false, error: "Enter the verification code." };
-  const payload = (claim.verificationPayload as { codeHash?: string }) ?? {};
+  const payload = (claim.verificationPayload as { codeHash?: string; createdAt?: number }) ?? {};
+  if (
+    typeof payload.createdAt !== "number" ||
+    Date.now() - payload.createdAt > OTP_TTL_MS
+  ) {
+    return { ok: false, error: "Code expired. Start over to request a new one." };
+  }
   if (!payload.codeHash || payload.codeHash !== hashCode(parsed.data.code.trim())) {
     return { ok: false, error: "Incorrect or expired code." };
   }
