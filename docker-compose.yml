@@ -89,6 +89,41 @@ services:
         echo "✓ Model ready."
     restart: "no"
 
+  # ---------------------------------------------------------------------------
+  # OSINT scraper tick. Runs `npm run scrape:tick` once a minute, picking up
+  # due ScrapeJobs and respecting robots.txt + per-host rate limits.
+  # Disabled by default — set SCRAPE_ENABLED=1 in your env to bring it up.
+  # ---------------------------------------------------------------------------
+  scrape:
+    image: simplyserved:local
+    depends_on:
+      web:
+        condition: service_started
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql://simplyserved:simplyserved@db:5432/simplyserved?schema=public
+      REDIS_URL: redis://redis:6379
+      YELP_API_KEY: ${YELP_API_KEY:-}
+      GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
+      SCRAPE_CHAMBERS: ${SCRAPE_CHAMBERS:-}
+      SCRAPE_SOCIAL_OG: ${SCRAPE_SOCIAL_OG:-}
+      NODE_ENV: production
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ "$$SCRAPE_ENABLED" != "1" ]; then
+          echo "Scraper disabled (set SCRAPE_ENABLED=1 to enable). Sleeping forever."
+          exec sleep infinity
+        fi
+        while true; do
+          node node_modules/tsx/dist/cli.mjs scripts/scrape-tick.ts || true
+          sleep 60
+        done
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:

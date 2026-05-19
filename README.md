@@ -184,6 +184,75 @@ prisma/
 
 ---
 
+## 🛰️ Scraping & OSINT
+
+SimplyServed can bootstrap its directory with net-new business profiles by
+scraping public sources. The pipeline is layered so each piece stays testable
+and polite:
+
+```
+adapter.discover(target) → adapter.normalize(raw)
+                              ↓
+                          dedup/merge → BusinessProfile (+ BusinessSource, BusinessMedia)
+                              ↓
+                          owner "Claim" flow → Listing
+```
+
+**Sources** (`lib/scrapers/`):
+
+| Source           | Adapter      | Enabled by                       | Notes                                       |
+| ---------------- | ------------ | -------------------------------- | ------------------------------------------- |
+| OpenStreetMap    | `osm`        | _always_ (ODbL, no key)          | Default seed source.                        |
+| Yelp Fusion API  | `yelp`       | `YELP_API_KEY`                   | Official API only — never scrapes HTML.     |
+| Google Places    | `google`     | `GOOGLE_PLACES_API_KEY`          | Official API only.                          |
+| Chamber of Comm. | `chamber`    | `SCRAPE_CHAMBERS=1` + JSON cfg   | Generic CSS adapter (`data/chambers.json`). |
+| BBB / YellowPgs  | _(planned)_  | per-site env flag                | Same generic-adapter pattern.               |
+| FB / IG (OG meta)| `social`     | `SCRAPE_SOCIAL_OG=1`             | Only public `og:*` tags. Never private.     |
+
+**Rules baked in** (`lib/scrapers/http.ts`):
+
+- `robots.txt` is fetched + cached and checked before every outbound request.
+- Per-host token bucket via `lib/rateLimit.ts` (Redis-backed). Default 1 req/s.
+- Exponential backoff with jitter on 429/5xx; `Retry-After` honored.
+- Descriptive User-Agent: `SimplyServed-Bot/1.0 (+contact)`.
+- Global circuit breaker: `SET scraper:halt 1` in Redis stops all scrapers.
+
+**Dedup + merge** (`lib/scrapers/merge.ts`, the highest-risk piece; covered by
+unit tests in `lib/scrapers/__tests__/merge.test.ts`):
+
+1. Same `(source, externalId)` → update existing source row in place.
+2. Same `dedupeKey` (SHA-256 of normalized name + phone + geo) → attach source.
+3. Fuzzy: name token-set ≥ 0.9 AND (within 100m OR phone match) → auto-merge.
+   Confidence 0.7–0.9 → routed to admin review queue (`/dashboard/admin/merges`).
+4. Garbage filter rejects: missing name/geo, stop-list names ("test", "closed"),
+   binary descriptions, 0,0 sentinel coords.
+5. Per-field merge precedence: GOOGLE > YELP > CHAMBER > BBB > YELLOWPAGES > OSM > others.
+
+**Running it:**
+
+```bash
+# One-off (admin Server Action also exposes this via /dashboard/admin/scraping):
+npm run scrape:once -- --source osm --target sf-mission
+
+# Pick up due jobs from the queue:
+npm run scrape:tick
+
+# In docker compose (off by default — safe):
+SCRAPE_ENABLED=1 docker compose up scrape
+```
+
+**Claim flow:** unclaimed `BusinessProfile`s appear at `/businesses`. Owners
+hit "Claim this listing" → verify via email-domain match, phone OTP, or
+document upload (admin-reviewed). On verify, a real `Listing` is minted in a
+single transaction and the profile back-links via `originBusinessProfileId`.
+Future scrape refreshes only touch fields the owner hasn't overridden
+(`Listing.ownerOverrides`).
+
+**Takedown:** `/businesses/<slug>/takedown` lets anyone request removal.
+Tombstoned profiles are never re-ingested.
+
+---
+
 ## 🚀 Roadmap (intentionally out of this PR)
 
 - Stripe Connect end-to-end (provider onboarding + payouts)
@@ -191,6 +260,7 @@ prisma/
 - WebSocket-based AI onboarding agent (replaces the current SSE bridge)
 - React Native shell that re-uses these same Server Actions over HTTPS
 - Background expiry cron for offer posts
+- BBB / YellowPages adapters; per-chamber-site config catalog
 
 Everything above is unblocked because the core abstractions
 (`lib/storage.ts`, `lib/payments.ts`, `lib/redis.ts`) are interface-first.

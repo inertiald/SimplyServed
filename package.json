@@ -11,6 +11,9 @@
     "prisma:migrate": "prisma migrate deploy",
     "prisma:push": "prisma db push --skip-generate --accept-data-loss",
     "prisma:seed": "tsx prisma/seed.ts",
+    "scrape:once": "tsx scripts/scrape-tick.ts",
+    "scrape:tick": "tsx scripts/scrape-tick.ts",
+    "test": "node --import tsx --test lib/scrapers/__tests__/*.test.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {

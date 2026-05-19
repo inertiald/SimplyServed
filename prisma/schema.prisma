@@ -76,6 +76,15 @@ model Listing {
   ratingAvg   Float @default(0)
   ratingCount Int   @default(0)
 
+  // When a scraped BusinessProfile is claimed and converted into a Listing,
+  // we keep a back-pointer here so refreshes can update non-overridden fields.
+  // `ownerOverrides` is a JSON mask of field names the owner has manually
+  // edited (e.g. { "description": true }) — those fields are never overwritten
+  // by future scrape refreshes.
+  originBusinessProfileId String?          @unique
+  originBusinessProfile   BusinessProfile? @relation("BusinessProfileClaim", fields: [originBusinessProfileId], references: [id], onDelete: SetNull)
+  ownerOverrides          Json?            @db.JsonB
+
   requests    ServiceRequest[]
   impressions Impression[]
   posts       Post[]
@@ -287,4 +296,200 @@ enum LedgerKind {
   FEE          // platform fee taken from the release
   REFUND       // escrow → consumer when request is CANCELED/DROPPED after hold
   ADJUSTMENT   // manual adjustment (admin)
+}
+
+// -----------------------------------------------------------------------------
+// 7. BUSINESS PROFILES — OSINT-scraped, dedup'd, mergeable, claimable
+// -----------------------------------------------------------------------------
+// `BusinessProfile` is the canonical row for a business that was discovered
+// out in the wild (OSM, Yelp, Google, chamber-of-commerce directories, …).
+// Multiple `BusinessSource` rows attach raw payloads from each provider for
+// audit + re-merge. When a real owner completes the claim flow we mint a
+// `Listing` from this profile and back-link via `Listing.originBusinessProfileId`.
+model BusinessProfile {
+  id   String @id @default(uuid())
+  slug String @unique
+
+  name        String
+  description String? @db.Text
+  category    String?
+  phone       String?
+  email       String?
+  website     String?
+
+  address    String?
+  city       String?
+  region     String?
+  postalCode String?
+  country    String?
+
+  // Geo + H3 indexing (same convention as Listing for cheap cross-queries).
+  lat            Float?
+  lng            Float?
+  h3City         String?
+  h3Neighborhood String?
+
+  hours       Json?    @db.JsonB
+  socialLinks Json?    @db.JsonB
+  tags        String[] @default([])
+
+  // Cross-source aggregated rating snapshot. Per-source ratings live on
+  // `BusinessSource.rating` / `reviewCount` for attribution.
+  ratingAvg   Float @default(0)
+  ratingCount Int   @default(0)
+
+  // Dedup: SHA-256 of (normalizedName | normalizedPhone | geoBucket).
+  // Unique so a second source for the same business attaches instead of
+  // duplicating.
+  dedupeKey       String @unique
+  confidenceScore Float  @default(1)
+
+  claimStatus      ClaimStatus @default(UNCLAIMED)
+  claimedListingId String?     @unique
+  claimedListing   Listing?    @relation("BusinessProfileClaim")
+
+  // When set, this profile has been taken down (owner request, copyright,
+  // ToS violation, etc.) and must not be re-ingested by scrape runs.
+  tombstonedAt     DateTime?
+  tombstoneReason  String?
+
+  lastScrapedAt DateTime?
+  nextScrapeAt  DateTime?
+
+  sources BusinessSource[]
+  media   BusinessMedia[]
+  claims  BusinessClaim[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([h3Neighborhood, claimStatus])
+  @@index([h3City, claimStatus])
+  @@index([nextScrapeAt])
+  @@index([claimStatus, createdAt])
+}
+
+enum ClaimStatus {
+  UNCLAIMED
+  PENDING
+  CLAIMED
+  REJECTED
+}
+
+model BusinessSource {
+  id                String          @id @default(uuid())
+  businessProfileId String
+  businessProfile   BusinessProfile @relation(fields: [businessProfileId], references: [id], onDelete: Cascade)
+
+  source      ScrapeSource
+  sourceUrl   String
+  externalId  String?
+  rawPayload  Json         @db.JsonB
+  rating      Float?
+  reviewCount Int?
+
+  fetchedAt   DateTime @default(now())
+  etag        String?
+  contentHash String?
+
+  @@unique([source, sourceUrl])
+  @@unique([source, externalId])
+  @@index([businessProfileId])
+}
+
+enum ScrapeSource {
+  YELP
+  GOOGLE
+  BBB
+  YELLOWPAGES
+  CHAMBER
+  OPENSTREETMAP
+  FACEBOOK
+  INSTAGRAM
+  OTHER
+}
+
+model BusinessMedia {
+  id                String          @id @default(uuid())
+  businessProfileId String
+  businessProfile   BusinessProfile @relation(fields: [businessProfileId], references: [id], onDelete: Cascade)
+
+  kind         MediaKind
+  url          String // stored copy (lib/storage.ts)
+  originUrl    String
+  originSource ScrapeSource
+  width        Int?
+  height       Int?
+  phash        String? // perceptual hash for image dedup
+  caption      String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([businessProfileId, phash])
+  @@index([businessProfileId, kind])
+}
+
+enum MediaKind {
+  IMAGE
+  VIDEO
+}
+
+model BusinessClaim {
+  id                String          @id @default(uuid())
+  businessProfileId String
+  businessProfile   BusinessProfile @relation(fields: [businessProfileId], references: [id], onDelete: Cascade)
+
+  claimantUserId String
+  status         ClaimDecisionStatus @default(PENDING)
+
+  verificationMethod  VerificationMethod
+  verificationPayload Json?              @db.JsonB
+
+  submittedAt    DateTime  @default(now())
+  decidedAt      DateTime?
+  decidedByUserId String?
+
+  @@index([businessProfileId, status])
+  @@index([claimantUserId, status])
+}
+
+enum ClaimDecisionStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum VerificationMethod {
+  EMAIL_DOMAIN
+  PHONE_OTP
+  DOC_UPLOAD
+  ADMIN
+}
+
+model ScrapeJob {
+  id     String       @id @default(uuid())
+  source ScrapeSource
+  target String // e.g. city slug, h3 cell, category, or chamber site id
+
+  status        ScrapeJobStatus @default(QUEUED)
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  itemsSeen     Int             @default(0)
+  itemsUpserted Int             @default(0)
+  itemsRejected Int             @default(0)
+  error         String?
+  cursor        Json?           @db.JsonB
+
+  createdAt DateTime @default(now())
+
+  @@index([source, status, createdAt])
+  @@index([status, createdAt])
+}
+
+enum ScrapeJobStatus {
+  QUEUED
+  RUNNING
+  OK
+  FAILED
+  RATE_LIMITED
 }
