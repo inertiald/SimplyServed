@@ -107,6 +107,60 @@ const USERS: SeedUser[] = [
   },
 ];
 
+interface SeedBusiness {
+  slug: string;
+  name: string;
+  description: string;
+  category: string;
+  phone: string;
+  website: string;
+  address: string;
+  lat: number;
+  lng: number;
+}
+
+// Net-new, unclaimed businesses — the kind the OSINT scraper discovers. Seeded
+// near the default SF coords so the Vibe map + claim flow are demoable without
+// running a live scrape.
+const BUSINESSES: SeedBusiness[] = [
+  {
+    slug: "mission-bites-taqueria",
+    name: "Mission Bites Taqueria",
+    description:
+      "Family-run taqueria slinging al pastor and handmade tortillas since 1998. Discovered via OpenStreetMap — owners, claim it to start taking bookings.",
+    category: "Restaurant",
+    phone: "+1 415-555-0142",
+    website: "https://missionbites.example",
+    address: "2451 Mission St, San Francisco, CA",
+    lat: 37.7762,
+    lng: -122.4188,
+  },
+  {
+    slug: "valencia-cycle-works",
+    name: "Valencia Cycle Works",
+    description:
+      "Neighborhood bike shop: tune-ups, flat repairs, and used-bike refurbs. Walk-ins welcome.",
+    category: "Bike shop",
+    phone: "+1 415-555-0177",
+    website: "https://valenciacycle.example",
+    address: "899 Valencia St, San Francisco, CA",
+    lat: 37.7591,
+    lng: -122.4216,
+  },
+  {
+    slug: "dolores-bloom-florist",
+    name: "Dolores Bloom Florist",
+    description:
+      "Seasonal arrangements and same-day delivery across the Mission. Aggregated from public listings.",
+    category: "Florist",
+    phone: "+1 415-555-0193",
+    website: "https://doloresbloom.example",
+    address: "3618 18th St, San Francisco, CA",
+    lat: 37.7615,
+    lng: -122.4267,
+  },
+];
+
 async function main() {
   console.log("🌱 Seeding SimplyServed…");
 
@@ -118,6 +172,7 @@ async function main() {
   await prisma.review.deleteMany();
   await prisma.serviceRequest.deleteMany();
   await prisma.listing.deleteMany();
+  await prisma.businessProfile.deleteMany();
   await prisma.user.deleteMany();
 
   for (const u of USERS) {
@@ -279,6 +334,39 @@ async function main() {
         },
       });
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Seed unclaimed BusinessProfiles (OSINT-style) with an OpenStreetMap source.
+  // ---------------------------------------------------------------------------
+  for (const b of BUSINESSES) {
+    await prisma.businessProfile.create({
+      data: {
+        slug: b.slug,
+        name: b.name,
+        description: b.description,
+        category: b.category,
+        phone: b.phone,
+        website: b.website,
+        address: b.address,
+        city: "San Francisco",
+        region: "CA",
+        country: "US",
+        lat: b.lat,
+        lng: b.lng,
+        h3City: latLngToCell(b.lat, b.lng, RES_CITY),
+        h3Neighborhood: latLngToCell(b.lat, b.lng, RES_NEIGHBORHOOD),
+        dedupeKey: `seed:${b.slug}`,
+        claimStatus: "UNCLAIMED",
+        sources: {
+          create: {
+            source: "OPENSTREETMAP",
+            sourceUrl: `https://www.openstreetmap.org/?q=${encodeURIComponent(b.name)}`,
+            rawPayload: { name: b.name, seeded: true },
+          },
+        },
+      },
+    });
   }
 
   console.log("✅ Seed complete.");
