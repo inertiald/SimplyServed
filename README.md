@@ -208,6 +208,29 @@ adapter.discover(target) → adapter.normalize(raw)
 | Chamber of Comm. | `chamber`    | `SCRAPE_CHAMBERS=1` + JSON cfg   | Generic CSS adapter (`data/chambers.json`). |
 | BBB / YellowPgs  | _(planned)_  | per-site env flag                | Same generic-adapter pattern.               |
 | FB / IG (OG meta)| `social`     | `SCRAPE_SOCIAL_OG=1`             | Only public `og:*` tags. Never private.     |
+| Company website  | `website`    | `SCRAPE_WEBSITE_OFFERS=1`        | Public schema.org JSON-LD only → DIRECT channel prices. |
+| DoorDash store   | `doordash`   | `SCRAPE_DOORDASH=1`              | Public JSON-LD on the store page → DOORDASH channel. |
+| Angi pro         | `angi`       | `SCRAPE_ANGI=1`                  | Public JSON-LD on the pro page → ANGI channel. |
+
+The last three share one polite, config-driven factory
+(`lib/scrapers/marketplace.ts`). Each reads only the public schema.org
+JSON-LD a page already hands to search engines (parsed by the pure
+`lib/scrapers/jsonld.ts`) — never private or behind-auth content — to enrich a
+profile with **price quotes** and a hero image.
+
+### 💵 Cross-channel price comparison
+
+Every `BusinessProfile` can carry `BusinessPriceQuote` rows — one advertised
+price per `(channel, item)` across the company's own site, DoorDash, Angi, etc.
+The business profile page renders them as a sorted **price comparison table**
+(`components/PriceComparisonTable.tsx`) that flags the best price and shows a
+deep-link CTA per row. `lib/deeplinks.ts` (pure + unit-tested) turns each
+storefront URL into a native app deep link (e.g. `doordash://store/<id>`) with
+the https page as the browser fallback, so a consumer can navigate straight
+into the right channel to purchase. `lib/scrapers/pricing.ts` owns the merge +
+sort policy. New quotes flow through the same `runner` upsert path as media and
+are deduped per channel on re-scrape.
+
 
 **Rules baked in** (`lib/scrapers/http.ts`):
 

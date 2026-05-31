@@ -13,6 +13,7 @@ import { yelpScraper } from "./yelp";
 import { googleScraper } from "./google";
 import { chamberScraper } from "./chamber";
 import { socialScraper } from "./social";
+import { websiteScraper, doordashScraper, angiScraper } from "./marketplace";
 
 export const ALL_SCRAPERS: Scraper[] = [
   osmScraper,
@@ -20,6 +21,9 @@ export const ALL_SCRAPERS: Scraper[] = [
   googleScraper,
   chamberScraper,
   socialScraper,
+  websiteScraper,
+  doordashScraper,
+  angiScraper,
 ];
 
 export function getScraperBySource(source: ScrapeSource): Scraper | null {

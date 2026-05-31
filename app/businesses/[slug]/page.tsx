@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { MapPin, Globe, Phone, Mail, ShieldCheck } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
+import { PriceComparisonTable } from "@/components/PriceComparisonTable";
+import { comparisonRows } from "@/lib/scrapers/pricing";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,7 @@ export default async function BusinessProfilePage({
     include: {
       sources: { select: { source: true, sourceUrl: true } },
       media: { take: 6, orderBy: { createdAt: "desc" } },
+      priceQuotes: { orderBy: { amount: "asc" } },
     },
   });
   if (!profile || profile.tombstonedAt) notFound();
@@ -28,6 +31,7 @@ export default async function BusinessProfilePage({
 
   const user = await getSessionUser();
   const uniqueSources = [...new Set(profile.sources.map((s) => s.source))];
+  const priceRows = comparisonRows(profile.priceQuotes);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
@@ -108,6 +112,8 @@ export default async function BusinessProfilePage({
           ))}
           . SimplyServed scrapers respect robots.txt and rate-limit politely.
         </div>
+
+        <PriceComparisonTable rows={priceRows} businessName={profile.name} />
       </article>
 
       <aside className="ss-card flex flex-col gap-3 p-6">
