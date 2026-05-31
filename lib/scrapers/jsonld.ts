@@ -64,16 +64,16 @@ function typesOf(node: JsonLdNode): string[] {
 }
 
 function toNumber(v: unknown): number | undefined {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "number") return Number.isFinite(v) ? v : undefined;
   if (typeof v === "string") {
-    // A leading minus would be stripped below and silently flip sign, so reject
-    // negative strings outright (prices are non-negative in this domain).
-    if (v.includes("-")) return undefined;
-    // Strip currency symbols / thousands separators: "$1,299.00" → 1299.00.
-    // Keep only the first decimal point so malformed strings like "12.34.56"
-    // don't silently parse to a wrong value — they're rejected instead.
-    const cleaned = v.replace(/[^0-9.]/g, "");
-    if (!cleaned || (cleaned.match(/\./g)?.length ?? 0) > 1) return undefined;
+    // Keep digits, dot, and a leading sign; drop currency symbols + thousands
+    // separators ("$1,299.00" → "1299.00", "-122.39" → "-122.39"). Reject
+    // anything that isn't a single well-formed decimal so malformed strings
+    // like "12.34.56" don't silently parse to a wrong value. Sign is preserved
+    // here (geo coordinates are legitimately negative); price callers enforce
+    // non-negativity separately.
+    const cleaned = v.replace(/[^0-9.-]/g, "");
+    if (!/^-?\d*\.?\d+$/.test(cleaned)) return undefined;
     const n = Number.parseFloat(cleaned);
     return Number.isFinite(n) ? n : undefined;
   }

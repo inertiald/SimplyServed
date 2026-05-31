@@ -116,4 +116,11 @@ describe("extractBusinessCore", () => {
     assert.equal(core.rating, 4.6);
     assert.equal(core.reviewCount, 233);
   });
+
+  it("preserves negative geo coordinates encoded as strings", () => {
+    const html = `<script type="application/ld+json">{"@type":"LocalBusiness","name":"Far South","geo":{"latitude":"-33.8688","longitude":"-70.6693"}}</script>`;
+    const core = extractBusinessCore(html);
+    assert.equal(core.lat, -33.8688);
+    assert.equal(core.lng, -70.6693);
+  });
 });

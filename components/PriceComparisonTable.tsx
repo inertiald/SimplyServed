@@ -30,8 +30,8 @@ export function PriceComparisonTable({
         <div>
           <h2 className="text-base font-semibold text-white">Compare prices</h2>
           <p className="text-xs text-white/50">
-            Advertised across channels for {businessName}. Tap to order or book
-            via your preferred method.
+            Advertised across channels for {businessName}. Select an option to
+            order or book via your preferred method.
           </p>
         </div>
         <span className="ss-chip whitespace-nowrap">{rows.length} options</span>
