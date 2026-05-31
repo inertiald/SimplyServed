@@ -171,8 +171,9 @@ async function main() {
   await prisma.message.deleteMany();
   await prisma.review.deleteMany();
   await prisma.serviceRequest.deleteMany();
-  await prisma.listing.deleteMany();
+  // BusinessProfile.claimedListingId references Listing, so clear profiles first.
   await prisma.businessProfile.deleteMany();
+  await prisma.listing.deleteMany();
   await prisma.user.deleteMany();
 
   for (const u of USERS) {

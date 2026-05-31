@@ -83,7 +83,7 @@ function FlyToSelection({
 }) {
   const map = useMap();
   useEffect(() => {
-    if (lat == null || lng == null) return;
+    if (lat === null || lng === null) return;
     map.flyTo([lat, lng], Math.max(map.getZoom(), 16), { duration: 0.6 });
   }, [lat, lng, map]);
   return null;
