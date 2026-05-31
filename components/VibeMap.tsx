@@ -1,10 +1,25 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { Compass, Loader2, MapPin, Plus, RefreshCw, Tag, Briefcase, MessageSquare } from "lucide-react";
 import { cellPolygon, indexCoords, neighborhoodCellsAround, cellCenter } from "@/lib/h3";
 import { CreatePostModal, type ProviderListingOption } from "./CreatePostModal";
 import { PostCard, type PostCardData } from "./PostCard";
+import type { LeafletMapProps } from "./LeafletMap";
+
+// Leaflet touches `window` — load it client-side only.
+const LeafletMapDynamic = dynamic<LeafletMapProps>(
+  () => import("./LeafletMap").then((mod) => mod.LeafletMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full items-center justify-center text-white/40">
+        <Loader2 className="animate-spin" />
+      </div>
+    ),
+  },
+);
 
 interface DiscoveredListing {
   id: string;
@@ -113,7 +128,7 @@ export function VibeMap({ initialCoords, providerListings, signedIn }: VibeMapPr
     );
   };
 
-  // -- Compute SVG hex projection ------------------------------------------
+  // -- Compute Leaflet overlay geometry ------------------------------------
   const cellGeoms = useMemo(() => {
     return cells.map((cell) => {
       const polygon = cellPolygon(cell); // [[lat, lng], …]
@@ -133,15 +148,6 @@ export function VibeMap({ initialCoords, providerListings, signedIn }: VibeMapPr
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [posts]);
-
-  // Project lat/lng → SVG x/y around the user's center.
-  const SIZE = 480;
-  const SCALE = 60_000; // pixels per degree (approx for a small region)
-  const project = (lat: number, lng: number): [number, number] => {
-    const dx = (lng - coords.lng) * Math.cos((coords.lat * Math.PI) / 180);
-    const dy = coords.lat - lat;
-    return [SIZE / 2 + dx * SCALE, SIZE / 2 + dy * SCALE];
-  };
 
   const visiblePosts = activeCell
     ? posts.filter((p) => indexCoords(p.lat, p.lng).h3Neighborhood === activeCell)
@@ -168,76 +174,24 @@ export function VibeMap({ initialCoords, providerListings, signedIn }: VibeMapPr
           </div>
         </div>
 
+        {/* z-[500] keeps the banner above Leaflet's tile layer (z-index ~400) */}
         {liveBanner && (
-          <div className="absolute left-1/2 top-16 z-10 -translate-x-1/2 animate-fade-in rounded-full bg-indigo-500/90 px-3 py-1 text-xs font-medium text-white shadow-lg">
+          <div className="absolute left-1/2 top-16 z-[500] -translate-x-1/2 animate-fade-in rounded-full bg-indigo-500/90 px-3 py-1 text-xs font-medium text-white shadow-lg">
             {liveBanner}
           </div>
         )}
 
-        <div className="relative aspect-square w-full">
-          <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="h-full w-full">
-            <defs>
-              <radialGradient id="hex-glow" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor="rgba(236,72,153,0.35)" />
-                <stop offset="100%" stopColor="rgba(99,102,241,0.05)" />
-              </radialGradient>
-            </defs>
-
-            {cellGeoms.map(({ cell, polygon }) => {
-              const points = polygon.map(([lat, lng]) => project(lat, lng).join(",")).join(" ");
-              const count = postCountsByCell.get(cell) ?? 0;
-              const isMine = cell === myCell;
-              const isActive = cell === activeCell;
-              const intensity = Math.min(count / 4, 1);
-              const fill = isActive
-                ? "rgba(236,72,153,0.35)"
-                : isMine
-                  ? "rgba(99,102,241,0.25)"
-                  : `rgba(99,102,241,${0.05 + intensity * 0.25})`;
-              return (
-                <polygon
-                  key={cell}
-                  points={points}
-                  fill={fill}
-                  stroke="rgba(255,255,255,0.08)"
-                  strokeWidth={1}
-                  className="cursor-pointer transition-all hover:fill-fuchsia-500/30"
-                  onClick={() => setActiveCell(isActive ? null : cell)}
-                />
-              );
-            })}
-
-            {/* Listings */}
-            {listings.map((l) => {
-              const [x, y] = project(l.lat, l.lng);
-              return (
-                <g key={l.id}>
-                  <circle cx={x} cy={y} r={6} fill="#a5b4fc" />
-                  <circle cx={x} cy={y} r={6} fill="#a5b4fc" opacity={0.4} className="animate-pulse-ring" />
-                </g>
-              );
-            })}
-
-            {/* Posts (visualized as small dots) */}
-            {posts.map((p) => {
-              const [x, y] = project(p.lat, p.lng);
-              const color =
-                p.postType === "OFFER" ? "#f472b6" : p.postType === "BUSINESS" ? "#fbbf24" : "#7dd3fc";
-              return <circle key={p.id} cx={x} cy={y} r={3.5} fill={color} />;
-            })}
-
-            {/* You */}
-            {(() => {
-              const [x, y] = project(coords.lat, coords.lng);
-              return (
-                <g>
-                  <circle cx={x} cy={y} r={9} fill="url(#hex-glow)" />
-                  <circle cx={x} cy={y} r={5} fill="#fff" />
-                  <circle cx={x} cy={y} r={5} fill="#fff" opacity={0.5} className="animate-pulse-ring" />
-                </g>
-              );
-            })()}
-          </svg>
+        <div className="relative aspect-square w-full overflow-hidden">
+          <LeafletMapDynamic
+            coords={coords}
+            cellGeoms={cellGeoms}
+            myCell={myCell}
+            activeCell={activeCell}
+            onCellClick={(cell) => setActiveCell(activeCell === cell ? null : cell)}
+            postCountsByCell={postCountsByCell}
+            listings={listings}
+            posts={posts}
+          />
         </div>
 
         <div className="flex flex-wrap items-center gap-2 border-t border-white/5 px-4 py-3 text-[11px] text-white/60">
