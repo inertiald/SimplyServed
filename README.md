@@ -231,15 +231,35 @@ unit tests in `lib/scrapers/__tests__/merge.test.ts`):
 **Running it:**
 
 ```bash
-# One-off (admin Server Action also exposes this via /dashboard/admin/scraping):
-npm run scrape:once -- --source osm --target sf-mission
+# Zero-config: auto-seeds all OSM targets and any other enabled scrapers.
+# Safe to run from cron with no arguments.
+npm run scrape:tick       # picks up due jobs; if queue is empty, seeds + runs
+npm run scrape:once       # alias for the above
 
-# Pick up due jobs from the queue:
-npm run scrape:tick
+# Override with an explicit target (backward-compatible, no longer required):
+npm run scrape:once -- --source osm --target sf-mission
 
 # In docker compose (off by default — safe):
 SCRAPE_ENABLED=1 docker compose up scrape
 ```
+
+**Auto-seed behavior:** when the job queue is empty, `scrape:tick` iterates
+every enabled scraper × every target slug in `data/osm-targets.json` and
+creates `ScrapeJob` rows, skipping any target with a live QUEUED/RUNNING job
+or a completed job within the last hour (`SCRAPE_REFRESH_INTERVAL_MS`).
+Jobs run sequentially with a politeness delay between them
+(`SCRAPE_JOB_DELAY_MS`, default 2 s). The batch is capped at
+`SCRAPE_BATCH` jobs per tick (default 5). On a `RATE_LIMITED` result the
+tick stops pulling new jobs immediately rather than hammering the source.
+Single-job failures are logged and skipped; the tick always exits 0.
+
+**Environment overrides (all optional):**
+
+| Variable | Default | Description |
+|---|---|---|
+| `SCRAPE_BATCH` | `5` | Max jobs per tick |
+| `SCRAPE_JOB_DELAY_MS` | `2000` | Delay between jobs (ms) |
+| `SCRAPE_REFRESH_INTERVAL_MS` | `3600000` | Min age before re-seeding (ms) |
 
 **Claim flow:** unclaimed `BusinessProfile`s appear at `/businesses`. Owners
 hit "Claim this listing" → verify via email-domain match, phone OTP, or
