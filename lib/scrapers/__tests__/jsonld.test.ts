@@ -83,6 +83,11 @@ describe("extractPriceQuotes", () => {
     assert.equal(extractPriceQuotes(html).length, 0);
   });
 
+  it("rejects negative price strings (no silent sign flip)", () => {
+    const html = `<script type="application/ld+json">{"@type":"Offer","name":"Neg","price":"-5.00"}</script>`;
+    assert.equal(extractPriceQuotes(html).length, 0);
+  });
+
   it("keeps same-named items that differ in currency", () => {
     const html = `
       <script type="application/ld+json">{"@type":"Offer","name":"Combo","price":"10","priceCurrency":"USD"}</script>

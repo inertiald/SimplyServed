@@ -247,9 +247,9 @@ export async function upsertNormalized(
   // (profile, channel, label) so re-scrapes refresh prices in place. Channel
   // falls back to the source's natural channel when the adapter doesn't set it.
   for (const q of n.priceQuotes ?? []) {
-    if (typeof q.amount !== "number" || q.amount <= 0 || !q.label?.trim()) continue;
+    const label = q.label?.trim().slice(0, 120);
+    if (typeof q.amount !== "number" || q.amount <= 0 || !label) continue;
     const channel = resolvePriceChannel(q.channel, n.source);
-    const label = q.label.trim().slice(0, 120);
     try {
       await prisma.businessPriceQuote.upsert({
         where: {

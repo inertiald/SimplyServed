@@ -66,6 +66,9 @@ function typesOf(node: JsonLdNode): string[] {
 function toNumber(v: unknown): number | undefined {
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string") {
+    // A leading minus would be stripped below and silently flip sign, so reject
+    // negative strings outright (prices are non-negative in this domain).
+    if (v.includes("-")) return undefined;
     // Strip currency symbols / thousands separators: "$1,299.00" → 1299.00.
     // Keep only the first decimal point so malformed strings like "12.34.56"
     // don't silently parse to a wrong value — they're rejected instead.
