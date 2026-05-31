@@ -46,7 +46,9 @@ function segmentAfter(url: URL, prefix: string): string | null {
   return parts[i + 1] || null;
 }
 
-/** Trailing numeric id from a slug like "joes-plumbing-12345". */
+/** Trailing numeric id from a slug like "joes-plumbing-12345". Requires at
+ * least 3 digits so we don't mistake a short street number or version segment
+ * for a provider id. */
 function trailingId(slug: string | null): string | null {
   if (!slug) return null;
   const m = slug.match(/(\d{3,})$/);

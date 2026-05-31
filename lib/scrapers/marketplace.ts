@@ -109,13 +109,14 @@ export function createMarketplaceScraper(cfg: MarketplaceConfig): Scraper {
       const p = raw.payload as StorefrontPayload;
       if (!p || !p.core) return null;
       const name = p.core.name;
-      // A storefront with neither a name nor any price isn't worth a profile.
-      if (!name && p.quotes.length === 0) return null;
+      // Without a business name we can't dedupe or merge the profile sanely, so
+      // drop it rather than minting an "Unknown business" placeholder.
+      if (!name?.trim()) return null;
       return {
         source: raw.source,
         sourceUrl: raw.sourceUrl ?? p.url,
         externalId: p.url,
-        name: name ?? "Unknown business",
+        name: name.trim(),
         description: p.core.description,
         phone: p.core.phone,
         website: p.core.website ?? p.url,

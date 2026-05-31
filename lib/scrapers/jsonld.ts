@@ -66,9 +66,11 @@ function typesOf(node: JsonLdNode): string[] {
 function toNumber(v: unknown): number | undefined {
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string") {
-    // Strip currency symbols / thousands separators: "$1,299.00" → 1299.00
+    // Strip currency symbols / thousands separators: "$1,299.00" → 1299.00.
+    // Keep only the first decimal point so malformed strings like "12.34.56"
+    // don't silently parse to a wrong value — they're rejected instead.
     const cleaned = v.replace(/[^0-9.]/g, "");
-    if (!cleaned) return undefined;
+    if (!cleaned || (cleaned.match(/\./g)?.length ?? 0) > 1) return undefined;
     const n = Number.parseFloat(cleaned);
     return Number.isFinite(n) ? n : undefined;
   }
@@ -125,13 +127,14 @@ export function extractPriceQuotes(
   const push = (label: string, amount?: number, currency?: string, url?: string) => {
     if (typeof amount !== "number" || amount <= 0) return;
     const cleanLabel = label.trim() || fallbackLabel;
-    const key = `${cleanLabel.toLowerCase()}|${amount}`;
+    const ccy = currency || "USD";
+    const key = `${cleanLabel.toLowerCase()}|${amount}|${ccy}`;
     if (seen.has(key)) return;
     seen.add(key);
     quotes.push({
       label: cleanLabel,
       amount,
-      currency: currency || "USD",
+      currency: ccy,
       url: url || undefined,
     });
   };

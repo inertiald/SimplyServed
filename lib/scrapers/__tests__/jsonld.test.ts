@@ -77,6 +77,18 @@ describe("extractPriceQuotes", () => {
     const html = `<script type="application/ld+json">{"@type":"Offer","name":"Free","price":"0"}</script>`;
     assert.equal(extractPriceQuotes(html).length, 0);
   });
+
+  it("rejects malformed prices with multiple decimal points", () => {
+    const html = `<script type="application/ld+json">{"@type":"Offer","name":"Bad","price":"12.34.56"}</script>`;
+    assert.equal(extractPriceQuotes(html).length, 0);
+  });
+
+  it("keeps same-named items that differ in currency", () => {
+    const html = `
+      <script type="application/ld+json">{"@type":"Offer","name":"Combo","price":"10","priceCurrency":"USD"}</script>
+      <script type="application/ld+json">{"@type":"Offer","name":"Combo","price":"10","priceCurrency":"CAD"}</script>`;
+    assert.equal(extractPriceQuotes(html).length, 2);
+  });
 });
 
 describe("extractMedia", () => {
