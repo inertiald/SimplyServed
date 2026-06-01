@@ -33,6 +33,25 @@ services:
     volumes:
       - uploads_data:/app/public/uploads
 
+  simulator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    image: simplyserved:local
+    environment:
+      DATABASE_URL: postgresql://simplyserved:simplyserved@db:5432/simplyserved?schema=public
+      REDIS_URL: redis://redis:6379
+      ENABLE_SIMULATION: "true"
+      NODE_ENV: ${NODE_ENV:-development}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: npm run simulate
+    restart: "no"
+
   db:
     image: postgres:15-alpine
     environment:

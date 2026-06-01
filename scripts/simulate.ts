@@ -19,10 +19,20 @@ const prisma = new PrismaClient();
 
 const RES_NEIGHBORHOOD = 9;
 
+const ENABLE_SIMULATION = process.env.ENABLE_SIMULATION === "true";
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+
+function envNumber(name: string, fallback: number): number {
+  const value = process.env[name];
+  if (!value) return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 // ── Config ────────────────────────────────────────────────────────────────────
-const IMPRESSION_INTERVAL_MS = 3_000;   // add impressions every 3 s
-const POST_INTERVAL_MS = 30_000;        // maybe add a post every 30 s
-const POST_PROBABILITY = 0.3;           // 30% chance per interval
+const IMPRESSION_INTERVAL_MS = envNumber("SIM_IMPRESSION_INTERVAL_MS", 3_000); // add impressions every 3 s
+const POST_INTERVAL_MS = envNumber("SIM_POST_INTERVAL_MS", 30_000);             // maybe add a post every 30 s
+const POST_PROBABILITY = envNumber("SIM_POST_PROBABILITY", 0.3);                // 30% chance per interval
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const REACTIONS: Reaction[] = [Reaction.LIKE, Reaction.LOVE, Reaction.WOW];
@@ -107,8 +117,17 @@ async function maybeAddPost() {
 }
 
 async function main() {
+  if (!ENABLE_SIMULATION || IS_PRODUCTION) {
+    console.log("Simulation disabled (set ENABLE_SIMULATION=true and use non-production NODE_ENV to run).");
+    process.exit(0);
+  }
+
   console.log("🔄 SimplyServed engagement simulator running (Ctrl-C to stop)");
-  console.log("   Impressions every 3 s · new post ~30% chance per 30 s\n");
+  console.log(
+    `   Impressions every ${IMPRESSION_INTERVAL_MS} ms · new post ~${Math.round(
+      POST_PROBABILITY * 100,
+    )}% chance per ${POST_INTERVAL_MS} ms\n`,
+  );
 
   setInterval(addImpression, IMPRESSION_INTERVAL_MS);
   setInterval(maybeAddPost, POST_INTERVAL_MS);
