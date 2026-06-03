@@ -62,8 +62,7 @@ export async function GET(request: Request) {
   ]);
 
   // ── 3. Normalise to FeedItem (without score) ─────────────────────────────
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const postItems: UnscaledPostFeedItem[] = rawPosts.map((p: any) => ({
+  const postItems: UnscaledPostFeedItem[] = rawPosts.map((p) => ({
     kind: "post",
     id: p.id,
     createdAt: p.createdAt,
@@ -74,8 +73,7 @@ export async function GET(request: Request) {
     listing: p.listing,
   }));
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const listingItems: UnscaledListingFeedItem[] = rawListings.map((l: any) => ({
+  const listingItems: UnscaledListingFeedItem[] = rawListings.map((l) => ({
     kind: "listing",
     id: l.id,
     createdAt: l.createdAt,
