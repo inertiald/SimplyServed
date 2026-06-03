@@ -29,6 +29,9 @@ export interface Notifier {
   sendSms(message: SmsMessage): Promise<void>;
 }
 
+const OTP_EXPIRY_MINUTES = 15;
+const MAX_ERROR_BODY_CHARS = 280;
+
 const consoleNotifier: Notifier = {
   async sendOtp(message) {
     console.log(`[${message.context ?? "notify"}] OTP via ${message.channel} to ${message.to}: ${message.code}`);
@@ -54,7 +57,7 @@ class ResendNotifier implements Notifier {
     await this.sendEmail({
       to: message.to,
       subject: "Your SimplyServed verification code",
-      text: `Your verification code is ${message.code}. It expires in 15 minutes.`,
+      text: `Your verification code is ${message.code}. It expires in ${OTP_EXPIRY_MINUTES} minutes.`,
       context: message.context,
     });
   }
@@ -76,7 +79,9 @@ class ResendNotifier implements Notifier {
       }),
     });
     if (!res.ok) {
-      throw new Error(`Resend request failed: ${res.status} ${res.statusText}`);
+      throw new Error(
+        `Resend request failed: ${res.status} ${res.statusText}${await responseBodySuffix(res)}`,
+      );
     }
   }
 
@@ -94,11 +99,11 @@ class TwilioNotifier implements Notifier {
 
   async sendOtp(message: OtpMessage): Promise<void> {
     if (message.channel !== "phone") {
-      throw new Error("Twilio only supports SMS notifications");
+      throw new Error("Twilio only supports phone notifications");
     }
     await this.sendSms({
       to: message.to,
-      body: `Your SimplyServed verification code is ${message.code}. It expires in 15 minutes.`,
+      body: `Your SimplyServed verification code is ${message.code}. It expires in ${OTP_EXPIRY_MINUTES} minutes.`,
       context: message.context,
     });
   }
@@ -126,7 +131,9 @@ class TwilioNotifier implements Notifier {
       },
     );
     if (!res.ok) {
-      throw new Error(`Twilio request failed: ${res.status} ${res.statusText}`);
+      throw new Error(
+        `Twilio request failed: ${res.status} ${res.statusText}${await responseBodySuffix(res)}`,
+      );
     }
   }
 }
@@ -190,6 +197,13 @@ class FailSoftNotifier implements Notifier {
 function formatError(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
+}
+
+async function responseBodySuffix(response: Response): Promise<string> {
+  const body = (await response.text()).trim();
+  if (!body) return "";
+  const clipped = body.length > MAX_ERROR_BODY_CHARS ? `${body.slice(0, MAX_ERROR_BODY_CHARS)}…` : body;
+  return ` - ${clipped}`;
 }
 
 function createResendNotifier(): Notifier | null {
