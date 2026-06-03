@@ -22,6 +22,8 @@ jobs:
           cache: npm
 
       - name: Install dependencies
+        env:
+          DATABASE_URL: postgresql://simplyserved:simplyserved@localhost:5432/simplyserved?schema=public
         run: npm ci
 
       - name: Lint
