@@ -103,12 +103,19 @@ export async function GET(request: Request) {
     }),
   ]);
 
+  const businessesWithCoords = rawBusinesses.filter(
+    (
+      business,
+    ): business is (typeof rawBusinesses)[number] & { lat: number; lng: number } =>
+      business.lat !== null && business.lng !== null,
+  );
+
   const listings = origin
     ? rawListings.filter((listing) => haversineMiles(origin, listing) <= ring)
     : rawListings;
   const businesses = origin
-    ? rawBusinesses.filter((business) => haversineMiles(origin, business) <= ring)
-    : rawBusinesses;
+    ? businessesWithCoords.filter((business) => haversineMiles(origin, business) <= ring)
+    : businessesWithCoords;
 
   return NextResponse.json({
     cells,
