@@ -206,7 +206,7 @@ adapter.discover(target) → adapter.normalize(raw)
 | Yelp Fusion API  | `yelp`       | `YELP_API_KEY`                   | Official API only — never scrapes HTML.     |
 | Google Places    | `google`     | `GOOGLE_PLACES_API_KEY`          | Official API only.                          |
 | Chamber of Comm. | `chamber`    | `SCRAPE_CHAMBERS=1` + JSON cfg   | Generic CSS adapter (`data/chambers.json`). |
-| BBB / YellowPgs  | _(planned)_  | per-site env flag                | Same generic-adapter pattern.               |
+| BBB / YellowPgs  | `bbb` / `yellowpages` | `SCRAPE_BBB=1` / `SCRAPE_YELLOWPAGES=1` | JSON-LD ItemList + HTML fallback (BBB); result-card HTML (YP). |
 | FB / IG (OG meta)| `social`     | `SCRAPE_SOCIAL_OG=1`             | Only public `og:*` tags. Never private.     |
 | Company website  | `website`    | `SCRAPE_WEBSITE_OFFERS=1`        | Public schema.org JSON-LD only → DIRECT channel prices. |
 | DoorDash store   | `doordash`   | `SCRAPE_DOORDASH=1`              | Public JSON-LD on the store page → DOORDASH channel. |
@@ -303,7 +303,7 @@ Tombstoned profiles are never re-ingested.
 - WebSocket-based AI onboarding agent (replaces the current SSE bridge)
 - React Native shell that re-uses these same Server Actions over HTTPS
 - Background expiry cron for offer posts
-- BBB / YellowPages adapters; per-chamber-site config catalog
+- BBB / YellowPages adapters — **done** (`lib/scrapers/bbb.ts`, `lib/scrapers/yellowpages.ts`); per-chamber-site config catalog
 
 Everything above is unblocked because the core abstractions
 (`lib/storage.ts`, `lib/payments.ts`, `lib/redis.ts`) are interface-first.
