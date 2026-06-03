@@ -141,6 +141,10 @@ services:
   # Disabled by default — set SCRAPE_ENABLED=1 in your env to bring it up.
   # ---------------------------------------------------------------------------
   scrape:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
     image: simplyserved:local
     depends_on:
       web:
