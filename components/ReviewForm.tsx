@@ -34,6 +34,23 @@ export function ReviewForm({
   );
 
   const display = hover || rating;
+  const ratingLabel = rating > 0 ? `${rating} of 5 stars selected` : "No rating selected";
+
+  const onRatingKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, current: number) => {
+    if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+      e.preventDefault();
+      setRating(Math.min(5, current + 1));
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+      e.preventDefault();
+      setRating(Math.max(1, current - 1));
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      setRating(1);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      setRating(5);
+    }
+  };
 
   return (
     <form action={action} className="flex flex-col gap-2">
@@ -41,14 +58,24 @@ export function ReviewForm({
       <input type="hidden" name="rating" value={rating} />
       <div className="flex items-center gap-2">
         <span className="text-xs text-white/60">Your rating</span>
-        <div className="flex" onMouseLeave={() => setHover(0)}>
+        <div
+          className="flex"
+          role="radiogroup"
+          aria-label="Rating"
+          aria-describedby={`review-rating-value-${requestId}`}
+          onMouseLeave={() => setHover(0)}
+        >
           {[1, 2, 3, 4, 5].map((n) => (
             <button
               key={n}
               type="button"
               onClick={() => setRating(n)}
               onMouseEnter={() => setHover(n)}
+              onKeyDown={(e) => onRatingKeyDown(e, n)}
               className="p-0.5 text-amber-300 transition hover:scale-110"
+              role="radio"
+              aria-checked={rating === n}
+              tabIndex={rating === 0 ? (n === 1 ? 0 : -1) : rating === n ? 0 : -1}
               aria-label={`Rate ${n} star${n === 1 ? "" : "s"}`}
             >
               <Star
@@ -58,8 +85,15 @@ export function ReviewForm({
             </button>
           ))}
         </div>
+        <span id={`review-rating-value-${requestId}`} role="status" aria-live="polite" className="text-xs text-white/60">
+          {ratingLabel}
+        </span>
       </div>
+      <label htmlFor={`review-body-${requestId}`} className="ss-label">
+        Review details (optional)
+      </label>
       <textarea
+        id={`review-body-${requestId}`}
         name="body"
         value={body}
         onChange={(e) => setBody(e.target.value)}
@@ -70,7 +104,7 @@ export function ReviewForm({
       />
       <div className="flex items-center justify-between">
         {state && !state.ok ? (
-          <span className="text-xs text-rose-300">{state.error}</span>
+          <span role="alert" className="text-xs text-rose-300">{state.error}</span>
         ) : (
           <span className="text-[11px] text-white/40">
             Visible publicly on the listing.
