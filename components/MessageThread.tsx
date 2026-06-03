@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { Loader2, MessageSquare, Send } from "lucide-react";
 import {
   loadThreadAction,
@@ -33,6 +33,9 @@ export function MessageThread({
   requestId: string;
   initialCount?: number;
 }) {
+  const logId = useId();
+  const inputId = useId();
+  const errorId = useId();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -125,6 +128,8 @@ export function MessageThread({
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="ss-btn-ghost text-xs"
+        aria-expanded={open}
+        aria-controls={logId}
       >
         <MessageSquare size={12} />
         Messages
@@ -138,11 +143,15 @@ export function MessageThread({
       {open && (
         <div className="mt-3 rounded-xl border border-white/10 bg-black/30 p-3">
           <div
+            id={logId}
             ref={scrollRef}
             className="max-h-64 overflow-y-auto pr-1"
+            role="log"
+            aria-live="polite"
+            aria-relevant="additions text"
           >
             {loading && messages.length === 0 ? (
-              <div className="flex justify-center py-4 text-xs text-white/40">
+              <div role="status" className="flex justify-center py-4 text-xs text-white/40">
                 <Loader2 size={12} className="animate-spin" />
               </div>
             ) : messages.length === 0 ? (
@@ -178,7 +187,11 @@ export function MessageThread({
 
           <form action={action} className="mt-3 flex items-center gap-2">
             <input type="hidden" name="requestId" value={requestId} />
+            <label htmlFor={inputId} className="sr-only">
+              Message
+            </label>
             <input
+              id={inputId}
               name="body"
               value={body}
               onChange={(e) => setBody(e.target.value)}
@@ -186,12 +199,14 @@ export function MessageThread({
               required
               maxLength={2000}
               className="ss-input flex-1"
+              aria-invalid={Boolean(state && !state.ok)}
+              aria-describedby={state && !state.ok ? errorId : undefined}
             />
             <button
               type="submit"
               disabled={pending || !body.trim()}
               className="ss-btn-primary !px-3"
-              aria-label="Send"
+              aria-label="Send message"
             >
               {pending ? (
                 <Loader2 size={12} className="animate-spin" />
@@ -201,7 +216,7 @@ export function MessageThread({
             </button>
           </form>
           {state && !state.ok && (
-            <p className="mt-1 text-xs text-rose-300">{state.error}</p>
+            <p id={errorId} role="alert" className="mt-1 text-xs text-rose-300">{state.error}</p>
           )}
         </div>
       )}

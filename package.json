@@ -15,8 +15,10 @@
     "scrape:once": "tsx scripts/scrape-tick.ts",
     "scrape:tick": "tsx scripts/scrape-tick.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test lib/scrapers/__tests__/*.test.ts",
-    "postinstall": "prisma generate"
+    "test": "node --import tsx --test lib/scrapers/__tests__/*.test.ts lib/__tests__/*.test.ts",
+    "postinstall": "prisma generate",
+    "expire:offers": "tsx scripts/expire-offers.ts",
+    "expire:tick": "tsx scripts/expire-offers.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
