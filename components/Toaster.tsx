@@ -84,7 +84,9 @@ function ToastCard({ toast: t, onClose }: { toast: Toast; onClose: () => void })
         : "text-indigo-200";
   return (
     <div
-      role="status"
+      role={tone === "error" ? "alert" : "status"}
+      aria-live={tone === "error" ? "assertive" : "polite"}
+      aria-atomic="true"
       className={`pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl border bg-black/80 px-4 py-3 text-sm text-white shadow-xl backdrop-blur-xl ${ring}`}
     >
       <Icon size={16} className={`mt-0.5 shrink-0 ${text}`} />
@@ -93,7 +95,7 @@ function ToastCard({ toast: t, onClose }: { toast: Toast; onClose: () => void })
         type="button"
         onClick={onClose}
         className="text-white/40 hover:text-white"
-        aria-label="Dismiss"
+        aria-label="Dismiss notification"
       >
         <X size={14} />
       </button>

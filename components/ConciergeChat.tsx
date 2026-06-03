@@ -271,6 +271,7 @@ export function ConciergeChat({
             }
           }}
           rows={1}
+          aria-label={agent === "concierge" ? "Send a message to concierge" : "Send a message to provider coach"}
           placeholder={
             agent === "concierge"
               ? "What do you need done in your neighborhood?"
