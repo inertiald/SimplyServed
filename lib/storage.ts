@@ -298,8 +298,8 @@ function getSignatureKey(
 }
 
 function canonicalUri(url: URL): string {
-  return url.pathname
-    .split("/")
-    .map((segment) => encodeURIComponent(decodeURIComponent(segment)))
-    .join("/");
+  return url.pathname.replace(
+    /[!'()*]/g,
+    (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
 }
