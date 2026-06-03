@@ -166,7 +166,7 @@ app/
     consumer            ─ request workflow + status badges
     provider            ─ listings + incoming queue
   listings/             ─ browse + detail + booking
-  vibe/                 ─ hex-grid neighborhood map (SVG, no map-library dep)
+  vibe/                 ─ neighborhood map (themed Leaflet/OSM) + live feed
   page.tsx              ─ landing
 components/             ─ all client/server UI primitives
 lib/

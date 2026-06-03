@@ -32,20 +32,49 @@ export async function GET(request: Request) {
     );
   }
 
-  const listings = await prisma.listing.findMany({
-    where: { h3Neighborhood: { in: cells }, status: "ACTIVE" },
-    take: 100,
-    orderBy: { createdAt: "desc" },
-    include: {
-      provider: { select: { id: true, name: true, avatarUrl: true } },
-      _count: { select: { impressions: true, requests: true } },
-    },
-  });
+  const [listings, businesses] = await Promise.all([
+    prisma.listing.findMany({
+      where: { h3Neighborhood: { in: cells }, status: "ACTIVE" },
+      take: 100,
+      orderBy: { createdAt: "desc" },
+      include: {
+        provider: { select: { id: true, name: true, avatarUrl: true } },
+        _count: { select: { impressions: true, requests: true } },
+      },
+    }),
+    // Net-new (unclaimed) businesses discovered via OSINT scraping. They share
+    // the same H3 indexing convention as listings, so the same cell disk works.
+    prisma.businessProfile.findMany({
+      where: {
+        h3Neighborhood: { in: cells },
+        claimStatus: { in: ["UNCLAIMED", "PENDING"] },
+        tombstonedAt: null,
+        lat: { not: null },
+        lng: { not: null },
+      },
+      take: 100,
+      orderBy: [{ ratingCount: "desc" }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        category: true,
+        city: true,
+        region: true,
+        lat: true,
+        lng: true,
+        h3Neighborhood: true,
+        ratingAvg: true,
+        ratingCount: true,
+      },
+    }),
+  ]);
 
   return NextResponse.json({
     cells,
     indexHint:
       lat && lng ? indexCoords(Number(lat), Number(lng)).h3Neighborhood : null,
     listings,
+    businesses,
   });
 }
