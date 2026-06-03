@@ -34,20 +34,20 @@ also started on **ws://localhost:3001/api/agent/onboarding/ws**.
 
 **Demo accounts** (password: `password123`):
 
-| Email                          | Identity            |
-| ------------------------------ | ------------------- |
-| `ana@simplyserved.dev`         | Provider + Consumer |
-| `diego@simplyserved.dev`       | Provider + Consumer |
-| `studiorho@simplyserved.dev`   | Provider only       |
-| `maya@simplyserved.dev`        | Provider + Consumer |
-| `carlos@simplyserved.dev`      | Consumer only       |
+| Email                        | Identity            |
+| ---------------------------- | ------------------- |
+| `ana@simplyserved.dev`       | Provider + Consumer |
+| `diego@simplyserved.dev`     | Provider + Consumer |
+| `studiorho@simplyserved.dev` | Provider only       |
+| `maya@simplyserved.dev`      | Provider + Consumer |
+| `carlos@simplyserved.dev`    | Consumer only       |
 
 The first start takes ~60s while images download and `prisma db push` runs.
 Subsequent starts are instant.
 
 ---
 
-## 🏗️ Architecture
+## ✨ Feature overview
 
 | Layer                | Tech                                                                 |
 | -------------------- | -------------------------------------------------------------------- |
@@ -303,16 +303,29 @@ Future scrape refreshes only touch fields the owner hasn't overridden
 
 **Takedown:** `/businesses/<slug>/takedown` lets anyone request removal.
 Tombstoned profiles are never re-ingested.
+- Next.js 15 native stack: App Router + RSC + Server Actions.
+- Hyper-local discovery with H3 indexing and realtime SSE fan-out over Redis.
+- Booking workflow with enforced request-state transitions.
+- Internal wallet + append-only ledger escrow flow (Stripe-ready abstraction).
+- Local Ollama AI agents (`concierge`, `provider_coach`) and Vibe Pulse summary.
+- Polite OSINT scraper pipeline with dedup/merge, claim flow, and takedowns.
 
 ---
 
-## 🚀 Roadmap (intentionally out of this PR)
+## 📚 Documentation map
 
 - Stripe Connect end-to-end (provider onboarding + payouts)
 - Replace local-disk uploads with GCS signed URLs
 - React Native shell that re-uses these same Server Actions over HTTPS
 - Background expiry cron for offer posts
 - BBB / YellowPages adapters; per-chamber-site config catalog
+- [Architecture](docs/architecture.md)
+- [Money flow](docs/money.md)
+- [AI agents](docs/agents.md)
+- [Scraping & OSINT](docs/scraping.md)
+- [Development](docs/development.md)
+- [Configuration](docs/configuration.md)
+- [Contributing](CONTRIBUTING.md)
 
-Everything above is unblocked because the core abstractions
-(`lib/storage.ts`, `lib/payments.ts`, `lib/redis.ts`) are interface-first.
+For all implementation details previously in this README, use the docs pages
+above.
