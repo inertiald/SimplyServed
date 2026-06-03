@@ -30,7 +30,7 @@ body {
     @apply rounded-2xl border bg-white/[0.03] backdrop-blur-sm shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset];
   }
   .ss-input {
-    @apply w-full rounded-xl border bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 outline-none transition focus:border-indigo-400 focus:bg-white/10;
+    @apply w-full rounded-xl border bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/50 outline-none transition focus:border-indigo-400 focus:bg-white/10;
   }
   .ss-label {
     @apply mb-1.5 block text-xs font-medium uppercase tracking-wider text-white/60;
@@ -47,6 +47,11 @@ body {
   .ss-chip {
     @apply inline-flex items-center gap-1 rounded-full border bg-white/5 px-2.5 py-0.5 text-xs text-white/80;
   }
+}
+
+:where(button, [href], input, select, textarea, [role="button"], [role="radio"], [role="tab"]):focus-visible {
+  outline: 2px solid #a5b4fc;
+  outline-offset: 2px;
 }
 
 /* Hide scrollbars on horizontal chip rails. */

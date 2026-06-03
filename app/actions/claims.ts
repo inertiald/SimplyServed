@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { rateLimit } from "@/lib/rateLimit";
 import { indexCoords } from "@/lib/h3";
+import { getNotifier } from "@/lib/notify";
 import type { ActionResult } from "./auth";
 
 /**
@@ -18,9 +19,8 @@ import type { ActionResult } from "./auth";
  *   adminDecideClaim → for DOC_UPLOAD / ADMIN paths.
  *   requestTakedown  → tombstones a profile so we stop re-ingesting it.
  *
- * Notification stubs (email / phone OTP) log to console in dev — the exact
- * pattern used by the seed accounts. Swap the function bodies for Twilio /
- * Resend / Postmark in production.
+ * Notification sending goes through `lib/notify.ts`, which defaults to
+ * console logging in local dev and can swap to provider drivers via env vars.
  */
 
 const StartClaimSchema = z.object({
@@ -48,19 +48,12 @@ function emailDomain(website: string | null | undefined): string | null {
   }
 }
 
-/**
- * Dev-friendly notification stub. Production replaces these two with calls
- * to Twilio / Postmark / Resend behind the same interface.
- */
-async function sendOtp(channel: "email" | "phone", to: string, code: string) {
-  console.log(`[claim] OTP via ${channel} to ${to}: ${code}`);
-}
-
 export async function startClaimAction(
   _prev: ActionResult | undefined,
   formData: FormData,
 ): Promise<ActionResult> {
   const user = await requireUser();
+  const notifier = getNotifier();
 
   // Hard cap on claim attempts per user/IP to prevent claim-spam.
   const rl = await rateLimit(`claim:start:${user.id}`, 10, 60 * 60);
@@ -101,13 +94,13 @@ export async function startClaimAction(
         error: `Sign in with an email at @${domain} to use this method, or pick another.`,
       };
     }
-    await sendOtp("email", user.email, code);
+    await notifier.sendOtp({ channel: "email", to: user.email, code, context: "claim" });
     verificationPayload = { ...verificationPayload, domain };
   } else if (parsed.data.method === "PHONE_OTP") {
     if (!profile.phone) {
       return { ok: false, error: "No phone on record — choose another verification method." };
     }
-    await sendOtp("phone", profile.phone, code);
+    await notifier.sendOtp({ channel: "phone", to: profile.phone, code, context: "claim" });
     verificationPayload = { ...verificationPayload, phone: profile.phone };
   } else {
     // DOC_UPLOAD → no code; status stays PENDING until admin reviews.

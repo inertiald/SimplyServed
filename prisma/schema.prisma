@@ -20,6 +20,9 @@ model User {
   name            String
   avatarUrl       String?
   role            Role     @default(SUBSCRIBER)
+  stripeConnectAccountId      String?  @unique
+  stripeConnectOnboarded      Boolean  @default(false)
+  stripeConnectPayoutsEnabled Boolean  @default(false)
 
   // JSONB profile blobs — avoids 1:1 explosion while keeping fields searchable.
   consumerProfile Json?    @db.JsonB
@@ -282,11 +285,24 @@ model LedgerEntry {
   amount    Float   // signed: negative = debit, positive = credit
   currency  String  @default("USD")
   memo      String?
+  stripePaymentIntentId String? @unique
+  stripeTransferId      String? @unique
+  stripeRefundId        String? @unique
+  stripePayoutId        String? @unique
+  stripeStatus          String?
 
   createdAt DateTime @default(now())
 
   @@unique([requestId, kind])
   @@index([userId, createdAt(sort: Desc)])
+}
+
+model StripeWebhookEvent {
+  id         String   @id @default(uuid())
+  eventId    String   @unique
+  type       String
+  processedAt DateTime?
+  createdAt  DateTime @default(now())
 }
 
 enum LedgerKind {

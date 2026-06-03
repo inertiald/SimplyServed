@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { saveUpload } from "@/lib/storage";
+import { getStorage } from "@/lib/storage";
 import { requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -25,7 +25,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const stored = await saveUpload(file);
+    const storage = getStorage();
+    const stored = await storage.saveUpload(file);
     return NextResponse.json(stored);
   } catch (err) {
     return NextResponse.json(

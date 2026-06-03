@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { ListingCard } from "@/components/ListingCard";
 import { EmptyState } from "@/components/EmptyState";
+import { CategoryChipRail } from "@/components/CategoryChipRail";
 import { Search } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -54,33 +54,22 @@ export default async function ListingsPage({
       <form className="flex flex-wrap items-center gap-2" method="get">
         <div className="relative flex-1 min-w-[240px]">
           <Search size={14} className="absolute left-3 top-3 text-white/40" />
+          <label htmlFor="listings-search" className="sr-only">
+            Search services
+          </label>
           <input
+            id="listings-search"
             name="q"
             defaultValue={q}
             placeholder="Search services…"
             className="ss-input pl-9"
+            aria-label="Search services"
           />
         </div>
         <button className="ss-btn-primary" type="submit">Search</button>
       </form>
 
-      <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
-        <Link
-          href="/listings"
-          className={`ss-chip whitespace-nowrap ${!category ? "border-indigo-400 bg-indigo-500/20 text-white" : ""}`}
-        >
-          All
-        </Link>
-        {categories.map((c) => (
-          <Link
-            key={c.category}
-            href={`/listings?category=${encodeURIComponent(c.category)}`}
-            className={`ss-chip whitespace-nowrap ${category === c.category ? "border-indigo-400 bg-indigo-500/20 text-white" : ""}`}
-          >
-            {c.category}
-          </Link>
-        ))}
-      </div>
+      <CategoryChipRail categories={categories} selectedCategory={category} />
 
       {listings.length === 0 ? (
         <EmptyState
