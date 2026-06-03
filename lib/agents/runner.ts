@@ -14,7 +14,6 @@
  *   - Same loop drives both the consumer "Concierge" agent and the provider
  *     "Coach" agent — they only differ in prompt + tools.
  */
-import "server-only";
 import {
   chat,
   chatStream,

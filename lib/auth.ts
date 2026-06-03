@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import type { Role } from "@prisma/client";
 
-const COOKIE_NAME = "ss_session";
+export const SESSION_COOKIE_NAME = "ss_session";
 const SESSION_DAYS = 30;
 
 function getSecret(): Uint8Array {
@@ -55,7 +55,7 @@ export async function createSessionCookie(user: SessionUser): Promise<void> {
     .sign(getSecret());
 
   const jar = await cookies();
-  jar.set(COOKIE_NAME, token, {
+  jar.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -66,27 +66,21 @@ export async function createSessionCookie(user: SessionUser): Promise<void> {
 
 export async function destroySession(): Promise<void> {
   const jar = await cookies();
-  jar.delete(COOKIE_NAME);
+  jar.delete(SESSION_COOKIE_NAME);
 }
 
 export async function getSessionUser(): Promise<SessionUser | null> {
   const jar = await cookies();
-  const token = jar.get(COOKIE_NAME)?.value;
-  if (!token) return null;
-  try {
-    const { payload } = await jwtVerify(token, getSecret());
-    const p = payload as unknown as JwtPayload;
-    if (!p.sub) return null;
-    return {
-      id: p.sub,
-      email: p.email,
-      name: p.name,
-      role: p.role,
-      avatarUrl: p.avatarUrl,
-    };
-  } catch {
-    return null;
-  }
+  const token = jar.get(SESSION_COOKIE_NAME)?.value;
+  return token ? verifySessionToken(token) : null;
+}
+
+export async function getSessionUserFromCookieHeader(
+  cookieHeader: string | null | undefined,
+): Promise<SessionUser | null> {
+  if (!cookieHeader) return null;
+  const token = parseCookie(cookieHeader, SESSION_COOKIE_NAME);
+  return token ? verifySessionToken(token) : null;
 }
 
 export async function requireUser(): Promise<SessionUser> {
@@ -112,4 +106,40 @@ export async function authenticate(
     role: user.role,
     avatarUrl: user.avatarUrl,
   };
+}
+
+async function verifySessionToken(token: string): Promise<SessionUser | null> {
+  try {
+    const { payload } = await jwtVerify(token, getSecret());
+    const p = payload as unknown as JwtPayload;
+    if (!p.sub) return null;
+    return {
+      id: p.sub,
+      email: p.email,
+      name: p.name,
+      role: p.role,
+      avatarUrl: p.avatarUrl,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseCookie(header: string, name: string): string | null {
+  const parts = header.split(";");
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const idx = trimmed.indexOf("=");
+    if (idx === -1) continue;
+    const key = trimmed.slice(0, idx).trim();
+    if (key !== name) continue;
+    const val = trimmed.slice(idx + 1);
+    try {
+      return decodeURIComponent(val);
+    } catch {
+      return val;
+    }
+  }
+  return null;
 }

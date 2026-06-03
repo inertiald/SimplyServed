@@ -1,6 +1,7 @@
 import { runAgent, type AgentEvent } from "@/lib/agents/runner";
 import { conciergeAgent } from "@/lib/agents/concierge";
 import { providerCoachAgent } from "@/lib/agents/provider_coach";
+import { onboardingAgent } from "@/lib/agents/onboarding";
 import { getSessionUser } from "@/lib/auth";
 import { rateLimit, rateLimitHeaders } from "@/lib/rateLimit";
 import type { ChatMessage } from "@/lib/ollama";
@@ -11,6 +12,7 @@ export const runtime = "nodejs";
 const AGENTS = {
   concierge: conciergeAgent,
   provider_coach: providerCoachAgent,
+  onboarding: onboardingAgent,
 };
 
 interface ChatRequest {
@@ -49,7 +51,7 @@ export async function POST(request: Request) {
   // Provider coach requires sign-in (it can scope to your listings); concierge
   // is fine anonymous, but we still pass the user when known.
   const user = await getSessionUser();
-  if (agent.id === "provider_coach" && !user) {
+  if ((agent.id === "provider_coach" || agent.id === "onboarding") && !user) {
     return new Response("Sign in required", { status: 401 });
   }
 
