@@ -17,6 +17,9 @@ import {
   useMap,
 } from "react-leaflet";
 import type { PostCardData } from "./PostCard";
+import type { MapSelection } from "@/lib/map-selection";
+
+export type { MapSelection };
 
 export interface CellGeom {
   cell: string;
@@ -43,12 +46,6 @@ export interface DiscoveredBusiness {
   lat: number;
   lng: number;
 }
-
-/** A currently-selected pin, shared between the map and the side list. */
-export type MapSelection =
-  | { kind: "listing"; id: string }
-  | { kind: "business"; id: string }
-  | null;
 
 export interface LeafletMapProps {
   coords: { lat: number; lng: number };

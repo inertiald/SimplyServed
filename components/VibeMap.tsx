@@ -27,13 +27,10 @@ import {
   type DiscoverRingMiles,
   type DiscoverSort,
 } from "@/lib/discover";
+import { resolveSelectionAfterFilter, type MapSelection } from "@/lib/map-selection";
 import { CreatePostModal, type ProviderListingOption } from "./CreatePostModal";
 import { PostCard, type PostCardData } from "./PostCard";
-import type {
-  LeafletMapProps,
-  DiscoveredBusiness,
-  MapSelection,
-} from "./LeafletMap";
+import type { LeafletMapProps, DiscoveredBusiness } from "./LeafletMap";
 
 const LeafletMapDynamic = dynamic<LeafletMapProps>(
   () => import("./LeafletMap").then((mod) => mod.LeafletMap),
@@ -215,12 +212,8 @@ export function VibeMap({ initialCoords, providerListings, signedIn }: VibeMapPr
   const nearbyCount = nearbyPlaces.length;
 
   useEffect(() => {
-    if (!selected) return;
-    const stillVisible = nearbyPlaces.some(
-      (place) => place.kind === selected.kind && place.id === selected.id,
-    );
-    if (!stillVisible) setSelected(null);
-  }, [nearbyPlaces, selected]);
+    setSelected((prev) => resolveSelectionAfterFilter(prev, nearbyPlaces));
+  }, [nearbyPlaces]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.05fr_1fr]">
