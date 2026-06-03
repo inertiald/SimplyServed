@@ -20,6 +20,7 @@ services:
       OLLAMA_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
       AUTH_SECRET: ${AUTH_SECRET:-dev-only-secret-please-change-me-aaaaaaaaaaaaaaaa}
+      ONBOARDING_WS_URL: ${ONBOARDING_WS_URL:-ws://localhost:3001/api/agent/onboarding/ws}
       NODE_ENV: production
     depends_on:
       db:
@@ -32,6 +33,32 @@ services:
     restart: unless-stopped
     volumes:
       - uploads_data:/app/public/uploads
+
+  onboarding-ws:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    image: simplyserved:local
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: postgresql://simplyserved:simplyserved@db:5432/simplyserved?schema=public
+      REDIS_URL: redis://redis:6379
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
+      AUTH_SECRET: ${AUTH_SECRET:-dev-only-secret-please-change-me-aaaaaaaaaaaaaaaa}
+      ONBOARDING_WS_HOST: 0.0.0.0
+      ONBOARDING_WS_PORT: 3001
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      ollama:
+        condition: service_started
+    command: npm run ws:onboarding
+    restart: unless-stopped
 
   simulator:
     build:

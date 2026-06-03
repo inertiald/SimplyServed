@@ -47,8 +47,8 @@ export function ClaimWizard(props: ClaimWizardProps) {
   return (
     <div className="flex flex-col gap-4">
       <section className="ss-card p-5">
-        <h2 className="text-base font-semibold text-white">1. Pick a verification method</h2>
-        <div className="mt-3 flex flex-col gap-2 text-sm">
+        <h2 id="claim-method-heading" className="text-base font-semibold text-white">1. Pick a verification method</h2>
+        <div className="mt-3 flex flex-col gap-2 text-sm" role="radiogroup" aria-labelledby="claim-method-heading">
           <MethodOption
             id="EMAIL_DOMAIN"
             label="Email at the business domain"
@@ -93,7 +93,7 @@ export function ClaimWizard(props: ClaimWizardProps) {
             review). Codes expire in 15 minutes.
           </p>
           {startState && !startState.ok && (
-            <p className="text-sm text-rose-300">{startState.error}</p>
+            <p role="alert" className="text-sm text-rose-300">{startState.error}</p>
           )}
           <button type="submit" disabled={startPending} className="ss-btn-primary">
             {startPending && <Loader2 size={14} className="animate-spin" />}
@@ -115,9 +115,11 @@ export function ClaimWizard(props: ClaimWizardProps) {
             className="ss-input"
             autoComplete="one-time-code"
             required
+            aria-invalid={Boolean(submitState && !submitState.ok)}
+            aria-describedby={submitState && !submitState.ok ? "claim-submit-error" : undefined}
           />
           {submitState && !submitState.ok && (
-            <p className="text-sm text-rose-300">{submitState.error}</p>
+            <p id="claim-submit-error" role="alert" className="text-sm text-rose-300">{submitState.error}</p>
           )}
           <button type="submit" disabled={submitPending} className="ss-btn-primary">
             {submitPending && <Loader2 size={14} className="animate-spin" />}
@@ -142,9 +144,11 @@ export function ClaimWizard(props: ClaimWizardProps) {
             placeholder="https://…"
             className="ss-input"
             required
+            aria-invalid={Boolean(submitState && !submitState.ok)}
+            aria-describedby={submitState && !submitState.ok ? "claim-submit-error" : undefined}
           />
           {submitState && !submitState.ok && (
-            <p className="text-sm text-rose-300">{submitState.error}</p>
+            <p id="claim-submit-error" role="alert" className="text-sm text-rose-300">{submitState.error}</p>
           )}
           <button type="submit" disabled={submitPending} className="ss-btn-primary">
             {submitPending && <Loader2 size={14} className="animate-spin" />}
@@ -175,6 +179,8 @@ function MethodOption({
       type="button"
       disabled={disabled}
       onClick={onSelect}
+      role="radio"
+      aria-checked={selected}
       className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition ${
         selected
           ? "border-indigo-400 bg-indigo-500/10 text-white"

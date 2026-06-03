@@ -29,24 +29,25 @@ docker compose up
 ```
 
 That's it. The web app is at **http://localhost:3000**, fully seeded with demo
-listings, posts, and a live coupon offer.
+listings, posts, and a live coupon offer. The onboarding WebSocket server is
+also started on **ws://localhost:3001/api/agent/onboarding/ws**.
 
 **Demo accounts** (password: `password123`):
 
-| Email                          | Identity            |
-| ------------------------------ | ------------------- |
-| `ana@simplyserved.dev`         | Provider + Consumer |
-| `diego@simplyserved.dev`       | Provider + Consumer |
-| `studiorho@simplyserved.dev`   | Provider only       |
-| `maya@simplyserved.dev`        | Provider + Consumer |
-| `carlos@simplyserved.dev`      | Consumer only       |
+| Email                        | Identity            |
+| ---------------------------- | ------------------- |
+| `ana@simplyserved.dev`       | Provider + Consumer |
+| `diego@simplyserved.dev`     | Provider + Consumer |
+| `studiorho@simplyserved.dev` | Provider only       |
+| `maya@simplyserved.dev`      | Provider + Consumer |
+| `carlos@simplyserved.dev`    | Consumer only       |
 
 The first start takes ~60s while images download and `prisma db push` runs.
 Subsequent starts are instant.
 
 ---
 
-## 🏗️ Architecture
+## ✨ Feature overview
 
 | Layer                | Tech                                                                 |
 | -------------------- | -------------------------------------------------------------------- |
@@ -103,19 +104,22 @@ plus per-user notification channels. New posts pop in instantly.
 
 ### 🤖 Local AI agents (Ollama)
 
-Two agents run against a local **llama-3.2:3b** model (small enough for laptop
-CPU, ~1.9 GB on disk). Both use the runner in `lib/agents/runner.ts`, which
-drives a chat-with-tools loop and emits structured SSE events
-(`thought` · `tool` · `tool_result` · `token` · `done`).
+Three agents run against a local **llama-3.2:3b** model (small enough for laptop
+CPU, ~1.9 GB on disk). They use the runner in `lib/agents/runner.ts`.
 
 | Agent            | Surface                                   | Tools                                          |
 | ---------------- | ----------------------------------------- | ---------------------------------------------- |
 | `concierge`      | `/concierge` chat page                    | `search_listings`, `get_listing`, `draft_request` |
 | `provider_coach` | "✨ Draft with AI" on new-listing page    | `suggest_price`, `draft_listing`, `draft_offer` |
+| `onboarding`     | `/onboarding` page (WebSocket + fallback) | `collect_business_basics`, `choose_category`, `set_location`, `verify_claim_handoff`, `draft_first_listing` |
 
 Tools query Postgres directly (e.g. `search_listings` is restricted to the
 caller's H3 ring), so recommendations are actually local. The agent never
 *creates* anything — it only drafts; the human commits in the existing UI.
+
+The onboarding agent streams via WebSocket (`ws://.../api/agent/onboarding/ws`)
+from `scripts/onboarding-ws.ts`. If the socket is unavailable, the UI
+automatically falls back to `POST /api/agent/chat` streaming.
 
 Bring it up with `docker compose up` (the `ollama-init` companion auto-pulls
 the model on first boot). The Next.js app gracefully falls back when Ollama is
@@ -150,6 +154,12 @@ Useful scripts:
 | `npm run lint`          | Next/ESLint                              |
 | `npm run prisma:push`   | Sync schema to DB (no migration files)   |
 | `npm run prisma:seed`   | Reset & seed demo data                   |
+| `npm run ws:onboarding` | Start onboarding WebSocket server        |
+
+For local non-Docker onboarding streaming:
+1. Run Next: `npm run dev`
+2. In another terminal run: `npm run ws:onboarding`
+3. Set `ONBOARDING_WS_URL` in `.env.local` if you need a non-default socket URL.
 
 Stripe environment variables (all optional for local development):
 
@@ -305,17 +315,29 @@ Future scrape refreshes only touch fields the owner hasn't overridden
 
 **Takedown:** `/businesses/<slug>/takedown` lets anyone request removal.
 Tombstoned profiles are never re-ingested.
+- Next.js 15 native stack: App Router + RSC + Server Actions.
+- Hyper-local discovery with H3 indexing and realtime SSE fan-out over Redis.
+- Booking workflow with enforced request-state transitions.
+- Internal wallet + append-only ledger escrow flow (Stripe-ready abstraction).
+- Local Ollama AI agents (`concierge`, `provider_coach`) and Vibe Pulse summary.
+- Polite OSINT scraper pipeline with dedup/merge, claim flow, and takedowns.
 
 ---
 
-## 🚀 Roadmap (intentionally out of this PR)
+## 📚 Documentation map
 
 - Stripe Connect end-to-end (provider onboarding + payouts)
 - Replace local-disk uploads with GCS signed URLs
-- WebSocket-based AI onboarding agent (replaces the current SSE bridge)
 - React Native shell that re-uses these same Server Actions over HTTPS
 - Background expiry cron for offer posts
 - BBB / YellowPages adapters; per-chamber-site config catalog
+- [Architecture](docs/architecture.md)
+- [Money flow](docs/money.md)
+- [AI agents](docs/agents.md)
+- [Scraping & OSINT](docs/scraping.md)
+- [Development](docs/development.md)
+- [Configuration](docs/configuration.md)
+- [Contributing](CONTRIBUTING.md)
 
-Everything above is unblocked because the core abstractions
-(`lib/storage.ts`, `lib/payments.ts`, `lib/redis.ts`) are interface-first.
+For all implementation details previously in this README, use the docs pages
+above.

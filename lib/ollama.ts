@@ -6,8 +6,6 @@
  *
  * No SDK dependency on purpose — Ollama's HTTP API is stable and small.
  */
-import "server-only";
-
 const BASE_URL = process.env.OLLAMA_URL ?? "http://localhost:11434";
 export const DEFAULT_MODEL = process.env.OLLAMA_MODEL ?? "llama3.2:3b";
 
