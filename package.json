@@ -14,6 +14,7 @@
     "simulate": "tsx scripts/simulate.ts",
     "scrape:once": "tsx scripts/scrape-tick.ts",
     "scrape:tick": "tsx scripts/scrape-tick.ts",
+    "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test lib/scrapers/__tests__/*.test.ts",
     "postinstall": "prisma generate"
   },
