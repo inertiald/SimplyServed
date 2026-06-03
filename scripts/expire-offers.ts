@@ -35,7 +35,7 @@ async function main() {
     const expired = await expireActiveOffers();
     console.log(`[expire:offers] Expired ${expired} offer post(s).`);
   } catch (err) {
-    console.warn("[expire:offers] Tick failed; leaving posts untouched this run.", err);
+    console.warn("[expire:offers] Failed to expire active offers; leaving posts untouched this run.", err);
   } finally {
     try {
       await prisma.$disconnect();

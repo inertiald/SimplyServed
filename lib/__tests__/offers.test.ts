@@ -27,6 +27,10 @@ describe("isOfferExpired", () => {
     assert.equal(isOfferExpired("2026-06-03T12:00:01.000Z", now), false);
   });
 
+  it("falls back to Date.parse for non-ISO strings", () => {
+    assert.equal(isOfferExpired("Wed, 03 Jun 2026 11:00:00 GMT", now), true);
+  });
+
   it("fails closed on invalid dates", () => {
     assert.equal(isOfferExpired("not-a-date", now), false);
   });
