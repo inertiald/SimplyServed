@@ -1,4 +1,5 @@
 export type OnboardingAgentId = "onboarding";
+export const MAX_HISTORY_LENGTH = 10;
 
 export interface UserTurnMessage {
   type: "user_turn";
@@ -49,7 +50,7 @@ export function parseClientMessage(raw: string): OnboardingClientMessage | null 
                   (m.role === "user" || m.role === "assistant") &&
                   typeof m.content === "string",
               )
-              .slice(-10)
+              .slice(-MAX_HISTORY_LENGTH)
           : undefined,
         lat: typeof data.lat === "number" ? data.lat : undefined,
         lng: typeof data.lng === "number" ? data.lng : undefined,

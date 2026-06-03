@@ -125,6 +125,7 @@ async function verifySessionToken(token: string): Promise<SessionUser | null> {
   }
 }
 
+/** Parse a raw Cookie header and return a decoded value for `name`, if present. */
 function parseCookie(header: string, name: string): string | null {
   const parts = header.split(";");
   for (const part of parts) {

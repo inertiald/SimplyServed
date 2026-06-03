@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUp, Loader2, MapPin, Sparkles, Wifi, WifiOff } from "lucide-react";
 import {
+  MAX_HISTORY_LENGTH,
   type OnboardingServerMessage,
   type OnboardingStepEvent,
 } from "@/lib/agents/onboarding_protocol";
@@ -21,6 +22,7 @@ const SUGGESTIONS = [
   "Guide me through claiming my bakery profile and creating my first listing.",
   "I do in-home tutoring. What should my first listing look like?",
 ];
+const MAX_RECONNECT_DELAY_MS = 8_000;
 
 export function OnboardingAgent({
   signedIn,
@@ -138,7 +140,7 @@ export function OnboardingAgent({
         if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
         const attempt = Math.min(reconnectRef.current + 1, 5);
         reconnectRef.current = attempt;
-        const delay = Math.min(8_000, 500 * 2 ** attempt);
+        const delay = Math.min(MAX_RECONNECT_DELAY_MS, 500 * 2 ** attempt);
         reconnectTimerRef.current = setTimeout(() => {
           connect();
         }, delay);
@@ -146,6 +148,7 @@ export function OnboardingAgent({
     } catch {
       setWsUnavailable(true);
       setWsOnline(false);
+      console.warn("Onboarding WebSocket connection failed");
     }
   }, [apply, resolvedWsUrl, signedIn]);
 
@@ -168,7 +171,7 @@ export function OnboardingAgent({
       try {
         const history = turns
           .filter((t) => t.status === "done" && t.text)
-          .slice(-6)
+          .slice(-MAX_HISTORY_LENGTH)
           .map((t) => ({ role: t.role, content: t.text }));
         const res = await fetch("/api/agent/chat", {
           method: "POST",
@@ -255,7 +258,7 @@ export function OnboardingAgent({
 
       const history = turns
         .filter((t) => t.status === "done" && t.text)
-        .slice(-6)
+        .slice(-MAX_HISTORY_LENGTH)
         .map((t) => ({ role: t.role, content: t.text }));
 
       const ws = wsRef.current;

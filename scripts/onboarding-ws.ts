@@ -15,6 +15,7 @@ const port = Number(process.env.ONBOARDING_WS_PORT ?? 3001);
 const host = process.env.ONBOARDING_WS_HOST ?? "0.0.0.0";
 const path = process.env.ONBOARDING_WS_PATH ?? "/api/agent/onboarding/ws";
 const maxBufferedBytes = Number(process.env.ONBOARDING_WS_MAX_BUFFER ?? 1_000_000);
+const maxBackpressureWaitMs = 2_000;
 
 const httpServer = createServer((_req, res) => {
   res.writeHead(404);
@@ -142,7 +143,11 @@ async function handleConnection(
         } else if (evt.type === "done") {
           await safeSend(socket, { type: "done", content: evt.content });
         } else if (evt.type === "error") {
-          await safeSend(socket, { type: "error", error: evt.error });
+          await safeSend(socket, {
+            type: "error",
+            code: "BAD_REQUEST",
+            error: evt.error,
+          });
         } else {
           await safeSend(socket, { type: "step", event: evt });
         }
@@ -150,6 +155,7 @@ async function handleConnection(
     } catch (err) {
       await safeSend(socket, {
         type: "error",
+        code: "BAD_REQUEST",
         error: (err as Error).message || "Onboarding agent failed.",
       });
     } finally {
@@ -162,7 +168,7 @@ async function safeSend(ws: WebSocket, msg: OnboardingServerMessage): Promise<vo
   if (ws.readyState !== WebSocket.OPEN) return;
   let waited = 0;
   while (ws.readyState === WebSocket.OPEN && ws.bufferedAmount > maxBufferedBytes) {
-    if (waited >= 2_000) {
+    if (waited >= maxBackpressureWaitMs) {
       throw new Error("Socket backpressure exceeded safe threshold.");
     }
     await sleep(25);
