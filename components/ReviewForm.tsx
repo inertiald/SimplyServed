@@ -35,14 +35,18 @@ export function ReviewForm({
 
   const display = hover || rating;
   const ratingLabel = rating > 0 ? `${rating} of 5 stars selected` : "No rating selected";
+  const determineRatingTabIndex = (n: number) => {
+    if (rating === 0) return n === 1 ? 0 : -1;
+    return rating === n ? 0 : -1;
+  };
 
   const onRatingKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, current: number) => {
     if (e.key === "ArrowRight" || e.key === "ArrowUp") {
       e.preventDefault();
-      setRating(Math.min(5, current + 1));
+      if (current < 5) setRating(current + 1);
     } else if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
       e.preventDefault();
-      setRating(Math.max(1, current - 1));
+      if (current > 1) setRating(current - 1);
     } else if (e.key === "Home") {
       e.preventDefault();
       setRating(1);
@@ -75,7 +79,7 @@ export function ReviewForm({
               className="p-0.5 text-amber-300 transition hover:scale-110"
               role="radio"
               aria-checked={rating === n}
-              tabIndex={rating === 0 ? (n === 1 ? 0 : -1) : rating === n ? 0 : -1}
+              tabIndex={determineRatingTabIndex(n)}
               aria-label={`Rate ${n} star${n === 1 ? "" : "s"}`}
             >
               <Star

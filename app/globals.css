@@ -30,7 +30,7 @@ body {
     @apply rounded-2xl border bg-white/[0.03] backdrop-blur-sm shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset];
   }
   .ss-input {
-    @apply w-full rounded-xl border bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/50 outline-none transition focus:border-indigo-400 focus:bg-white/10;
+    @apply w-full rounded-xl border bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/60 outline-none transition focus:border-indigo-400 focus:bg-white/10;
   }
   .ss-label {
     @apply mb-1.5 block text-xs font-medium uppercase tracking-wider text-white/60;

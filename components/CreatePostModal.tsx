@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 import { createPostAction } from "@/app/actions/posts";
 
 type Mode = "GENERAL" | "BUSINESS" | "OFFER";
+const FOCUSABLE_SELECTOR =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export interface ProviderListingOption {
   id: string;
@@ -51,9 +53,7 @@ export function CreatePostModal({
     restoreFocusRef.current = document.activeElement as HTMLElement | null;
     const dialog = dialogRef.current;
     if (!dialog) return;
-    const focusable = dialog.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    );
+    const focusable = dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
     focusable[0]?.focus();
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -64,9 +64,7 @@ export function CreatePostModal({
       }
       if (e.key !== "Tab") return;
       const currentFocusable = Array.from(
-        dialog.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ),
+        dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
       );
       if (currentFocusable.length === 0) return;
       const first = currentFocusable[0];

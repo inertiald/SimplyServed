@@ -63,7 +63,6 @@ export default async function ListingsPage({
             defaultValue={q}
             placeholder="Search services…"
             className="ss-input pl-9"
-            aria-label="Search services"
           />
         </div>
         <button className="ss-btn-primary" type="submit">Search</button>
