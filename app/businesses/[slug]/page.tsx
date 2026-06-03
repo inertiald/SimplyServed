@@ -3,6 +3,9 @@ import { notFound, redirect } from "next/navigation";
 import { MapPin, Globe, Phone, Mail, ShieldCheck } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
+import { PriceComparisonTable } from "@/components/PriceComparisonTable";
+import { comparisonRows } from "@/lib/scrapers/pricing";
+import { BusinessLocation } from "@/components/BusinessLocation";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +20,7 @@ export default async function BusinessProfilePage({
     include: {
       sources: { select: { source: true, sourceUrl: true } },
       media: { take: 6, orderBy: { createdAt: "desc" } },
+      priceQuotes: { orderBy: { amount: "asc" } },
     },
   });
   if (!profile || profile.tombstonedAt) notFound();
@@ -28,6 +32,7 @@ export default async function BusinessProfilePage({
 
   const user = await getSessionUser();
   const uniqueSources = [...new Set(profile.sources.map((s) => s.source))];
+  const priceRows = comparisonRows(profile.priceQuotes);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
@@ -108,36 +113,51 @@ export default async function BusinessProfilePage({
           ))}
           . SimplyServed scrapers respect robots.txt and rate-limit politely.
         </div>
+
+        <PriceComparisonTable rows={priceRows} businessName={profile.name} />
       </article>
 
-      <aside className="ss-card flex flex-col gap-3 p-6">
-        <h2 className="flex items-center gap-2 text-base font-semibold text-white">
-          <ShieldCheck size={16} /> Claim this listing
-        </h2>
-        <p className="text-xs text-white/60">
-          If you own or manage {profile.name}, claim it to update photos, hours,
-          pricing, and start accepting bookings.
-        </p>
-        {!user ? (
-          <Link href={`/sign-in?next=/businesses/${profile.slug}/claim`} className="ss-btn-primary">
-            Sign in to claim
-          </Link>
-        ) : profile.claimStatus === "PENDING" ? (
-          <p className="rounded-lg border border-yellow-400/30 bg-yellow-400/10 p-3 text-xs text-yellow-200">
-            A claim is already pending review.
-          </p>
-        ) : (
-          <Link href={`/businesses/${profile.slug}/claim`} className="ss-btn-primary">
-            Claim this listing
-          </Link>
+      <aside className="flex flex-col gap-4">
+        {profile.lat != null && profile.lng != null && (
+          <BusinessLocation
+            lat={profile.lat}
+            lng={profile.lng}
+            label={
+              [profile.address, profile.city, profile.region].filter(Boolean).join(", ") ||
+              "Approximate location"
+            }
+          />
         )}
 
-        <Link
-          href={`/businesses/${profile.slug}/takedown`}
-          className="text-center text-[11px] text-white/40 underline-offset-4 hover:underline"
-        >
-          Request removal
-        </Link>
+        <div className="ss-card flex flex-col gap-3 p-6">
+          <h2 className="flex items-center gap-2 text-base font-semibold text-white">
+            <ShieldCheck size={16} /> Claim this listing
+          </h2>
+          <p className="text-xs text-white/60">
+            If you own or manage {profile.name}, claim it to update photos, hours,
+            pricing, and start accepting bookings.
+          </p>
+          {!user ? (
+            <Link href={`/sign-in?next=/businesses/${profile.slug}/claim`} className="ss-btn-primary">
+              Sign in to claim
+            </Link>
+          ) : profile.claimStatus === "PENDING" ? (
+            <p className="rounded-lg border border-yellow-400/30 bg-yellow-400/10 p-3 text-xs text-yellow-200">
+              A claim is already pending review.
+            </p>
+          ) : (
+            <Link href={`/businesses/${profile.slug}/claim`} className="ss-btn-primary">
+              Claim this listing
+            </Link>
+          )}
+
+          <Link
+            href={`/businesses/${profile.slug}/takedown`}
+            className="text-center text-[11px] text-white/40 underline-offset-4 hover:underline"
+          >
+            Request removal
+          </Link>
+        </div>
       </aside>
     </div>
   );

@@ -33,6 +33,7 @@ import {
   RobotsDisallowed,
 } from "./http";
 import { ingestMedia } from "./media";
+import { resolvePriceChannel } from "./pricing";
 import { getScraperBySource } from "./registry";
 import type { NormalizedBusiness } from "./types";
 
@@ -239,6 +240,49 @@ export async function upsertNormalized(
       });
     } catch {
       // ignore — best-effort
+    }
+  }
+
+  // Upsert advertised price quotes for the price-comparison table. Keyed on
+  // (profile, channel, label) so re-scrapes refresh prices in place. Channel
+  // falls back to the source's natural channel when the adapter doesn't set it.
+  for (const q of n.priceQuotes ?? []) {
+    const label = q.label?.trim().slice(0, 120);
+    if (typeof q.amount !== "number" || q.amount <= 0 || !label) continue;
+    const channel = resolvePriceChannel(q.channel, n.source);
+    try {
+      await prisma.businessPriceQuote.upsert({
+        where: {
+          businessProfileId_channel_label: {
+            businessProfileId: profile.id,
+            channel,
+            label,
+          },
+        },
+        create: {
+          businessProfileId: profile.id,
+          channel,
+          source: n.source,
+          label,
+          amount: q.amount,
+          currency: q.currency ?? "USD",
+          unit: q.unit,
+          url: q.url ?? n.website ?? n.sourceUrl,
+          available: q.available ?? true,
+          externalId: q.externalId,
+        },
+        update: {
+          source: n.source,
+          amount: q.amount,
+          currency: q.currency ?? "USD",
+          unit: q.unit,
+          url: q.url ?? n.website ?? n.sourceUrl,
+          available: q.available ?? true,
+          externalId: q.externalId,
+        },
+      });
+    } catch {
+      // best-effort — a bad quote never fails the whole upsert.
     }
   }
 

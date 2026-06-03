@@ -27,6 +27,29 @@ export interface CandidateMedia {
   caption?: string;
 }
 
+/**
+ * One advertised price discovered on a source. The runner maps this onto a
+ * `BusinessPriceQuote` row. `channel` defaults to the source's natural channel
+ * when omitted (e.g. the DoorDash adapter implies the DOORDASH channel).
+ */
+export interface CandidatePriceQuote {
+  channel?:
+    | "DIRECT"
+    | "DOORDASH"
+    | "UBEREATS"
+    | "GRUBHUB"
+    | "ANGI"
+    | "THUMBTACK"
+    | "OTHER";
+  label: string;
+  amount: number;
+  currency?: string;
+  unit?: string;
+  url?: string;
+  available?: boolean;
+  externalId?: string;
+}
+
 export interface NormalizedBusiness {
   source: ScrapeSource;
   sourceUrl: string;
@@ -56,6 +79,7 @@ export interface NormalizedBusiness {
   reviewCount?: number;
 
   media?: CandidateMedia[];
+  priceQuotes?: CandidatePriceQuote[];
 }
 
 export interface ScraperTarget {

@@ -356,9 +356,10 @@ model BusinessProfile {
   lastScrapedAt DateTime?
   nextScrapeAt  DateTime?
 
-  sources BusinessSource[]
-  media   BusinessMedia[]
-  claims  BusinessClaim[]
+  sources     BusinessSource[]
+  media       BusinessMedia[]
+  claims      BusinessClaim[]
+  priceQuotes BusinessPriceQuote[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -406,6 +407,12 @@ enum ScrapeSource {
   OPENSTREETMAP
   FACEBOOK
   INSTAGRAM
+  DOORDASH
+  UBEREATS
+  GRUBHUB
+  ANGI
+  THUMBTACK
+  WEBSITE
   OTHER
 }
 
@@ -432,6 +439,60 @@ model BusinessMedia {
 enum MediaKind {
   IMAGE
   VIDEO
+}
+
+// -----------------------------------------------------------------------------
+// 7b. PRICE QUOTES — cross-channel price comparison
+// -----------------------------------------------------------------------------
+// A single advertised price for a business on a specific sales channel
+// (the company's own website, DoorDash, Angi, …). Many quotes per profile
+// power the price-comparison table. `url` is the public storefront/listing
+// URL for that channel; the app turns it into a native deep link at render
+// time (`lib/deeplinks.ts`) so a consumer can purchase via that method.
+//
+// Quotes are upserted per `(businessProfileId, channel, label)` so a re-scrape
+// of the same channel updates the price in place instead of duplicating it.
+model BusinessPriceQuote {
+  id                String          @id @default(uuid())
+  businessProfileId String
+  businessProfile   BusinessProfile @relation(fields: [businessProfileId], references: [id], onDelete: Cascade)
+
+  channel PriceChannel
+  source  ScrapeSource
+
+  // Human-readable item/service this price is for (e.g. "Margherita Pizza",
+  // "Drain unclogging", "Standard session"). Defaults to a channel label when
+  // the source only advertises a single headline price.
+  label String
+
+  amount   Float // in `currency` major units (e.g. dollars)
+  currency String  @default("USD")
+  unit     String? // e.g. "each", "per hour", "delivery", "+ fees"
+
+  // Public storefront/listing URL on this channel. Used to build the native
+  // deep link + web fallback the consumer taps to buy.
+  url       String?
+  available Boolean @default(true)
+
+  // Stable per-channel id (e.g. DoorDash store id) when known — lets a refresh
+  // line up with the prior quote even if the label changes.
+  externalId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([businessProfileId, channel, label])
+  @@index([businessProfileId, amount])
+}
+
+enum PriceChannel {
+  DIRECT // the business's own website / storefront
+  DOORDASH
+  UBEREATS
+  GRUBHUB
+  ANGI // formerly Angie's List
+  THUMBTACK
+  OTHER
 }
 
 model BusinessClaim {
