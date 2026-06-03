@@ -59,7 +59,7 @@ Subsequent starts are instant.
 | Validation           | Zod on every Server Action                                           |
 | Styling              | Tailwind 3, no design system dependency                              |
 | File uploads         | Local disk (dev) — pluggable interface in `lib/storage.ts`           |
-| Payments / payouts   | Internal wallet + double-entry ledger (`lib/payments.ts`, Stripe-ready) |
+| Payments / payouts   | Stripe Connect-backed wallet + double-entry ledger (`lib/payments.ts`, `lib/wallet.ts`) |
 
 ### Data model
 - **User** — single account with optional `consumerProfile` and `providerProfile` JSONB blobs.
@@ -84,10 +84,14 @@ Anyone CANCELs/DROPs
   before COMPLETE        ──► REFUND: consumer balance ↑
 ```
 `lib/wallet.ts` exposes `holdForRequest`, `releaseToProvider`, `refundConsumer`,
-and `fundWallet` (server-only). `lib/payments.ts` keeps only the pure fee math
-so client components can render quotes without pulling Prisma into the bundle.
-Swap those four function bodies for Stripe PaymentIntents + Transfers + Refunds
-and the rest of the app stays untouched.
+and `fundWallet` (server-only), now backed by Stripe Connect when Stripe keys
+are present. `lib/payments.ts` keeps only the pure fee math so client
+components can render quotes without pulling Prisma into the bundle. If Stripe
+keys are absent, wallet calls gracefully fall back to the local dev stub so
+local development keeps working.
+
+Stripe webhook endpoint: `POST /api/webhooks/stripe` (signature-verified,
+idempotent; reconciles account, payment intent, transfer, and payout events).
 
 ### Realtime fan-out
 ```
@@ -156,6 +160,14 @@ For local non-Docker onboarding streaming:
 1. Run Next: `npm run dev`
 2. In another terminal run: `npm run ws:onboarding`
 3. Set `ONBOARDING_WS_URL` in `.env.local` if you need a non-default socket URL.
+
+Stripe environment variables (all optional for local development):
+
+| Variable | Purpose |
+| --- | --- |
+| `STRIPE_SECRET_KEY` | Enables Stripe wallet + Connect calls |
+| `STRIPE_WEBHOOK_SECRET` | Verifies `POST /api/webhooks/stripe` signatures |
+| `STRIPE_CONNECT_CLIENT_ID` | Connect OAuth/onboarding client id |
 
 ---
 
