@@ -37,5 +37,5 @@ jobs:
 
       - name: Build
         env:
-          DATABASE_URL: dummy
+          DATABASE_URL: postgresql://simplyserved:simplyserved@localhost:5432/simplyserved?schema=public
         run: npm run build
