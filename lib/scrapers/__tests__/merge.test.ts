@@ -226,6 +226,10 @@ describe("geoBucket", () => {
   it("rounds to 3 decimal places", () => {
     assert.equal(geoBucket(37.76449, -122.41499), "37.764,-122.415");
   });
+  it("rounds up at the 4th-decimal boundary", () => {
+    // 37.7655 → 37.766 (rounds up the 3rd digit)
+    assert.equal(geoBucket(37.7655, -122.4100), "37.766,-122.410");
+  });
   it("coords within same ~110 m bucket produce identical key", () => {
     // 0.001° lat ≈ 110 m — two points 40 m apart share the same bucket
     assert.equal(geoBucket(37.7600, -122.4100), geoBucket(37.7604, -122.4104));
