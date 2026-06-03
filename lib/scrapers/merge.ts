@@ -26,6 +26,14 @@ const SOURCE_PRIORITY: Record<ScrapeSource, number> = {
   CHAMBER: 80,
   BBB: 70,
   YELLOWPAGES: 60,
+  // Commerce marketplaces: rich storefront data (images, descriptions) but
+  // below authoritative directories for canonical fields like name/address.
+  ANGI: 55,
+  THUMBTACK: 52,
+  DOORDASH: 50,
+  UBEREATS: 48,
+  GRUBHUB: 46,
+  WEBSITE: 45,
   OPENSTREETMAP: 40,
   FACEBOOK: 30,
   INSTAGRAM: 30,
