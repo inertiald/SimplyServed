@@ -56,3 +56,58 @@ body {
 .no-scrollbar {
   scrollbar-width: none;
 }
+
+/* ── Leaflet dark theming ─────────────────────────────────────────────── */
+/* Match the map chrome to the app's dark surface so tile gaps don't flash. */
+.leaflet-container {
+  background: var(--surface);
+  font-family: inherit;
+}
+.leaflet-control-zoom a {
+  background: var(--surface-2);
+  color: #e5e7eb;
+  border-color: var(--border);
+}
+.leaflet-control-zoom a:hover {
+  background: #1b2233;
+}
+.leaflet-control-attribution {
+  background: rgba(13, 17, 26, 0.7) !important;
+  color: rgba(229, 231, 235, 0.55) !important;
+}
+.leaflet-control-attribution a {
+  color: rgba(165, 180, 252, 0.8) !important;
+}
+
+/* Dark popups that read as part of the UI rather than default Leaflet white. */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--surface-2);
+  color: #e5e7eb;
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+.leaflet-popup-content {
+  margin: 0.65rem 0.85rem;
+}
+.leaflet-popup-close-button {
+  color: rgba(229, 231, 235, 0.6) !important;
+}
+.ss-popup-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.ss-popup-meta {
+  font-size: 0.72rem;
+  color: rgba(229, 231, 235, 0.55);
+}
+.ss-popup-link {
+  display: inline-block;
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #a5b4fc;
+}
+.ss-popup-link:hover {
+  text-decoration: underline;
+}
