@@ -567,19 +567,19 @@ function dedupe(arr: ListingHit[]): ListingHit[] {
     seen.add(l.id);
     out.push(l);
   }
-
-  function getRunningTool(tools: ToolBubble[]): ToolBubble | undefined {
-    for (let i = tools.length - 1; i >= 0; i--) {
-      if (tools[i]?.status === "running") return tools[i];
-    }
-    return undefined;
-  }
-
-  function humanToolLabel(name: string): string {
-    if (name === "search_listings") return "Searching nearby listings…";
-    if (name === "get_listing") return "Loading listing details…";
-    if (name === "draft_request") return "Drafting your request…";
-    return "Working…";
-  }
   return out;
+}
+
+function getRunningTool(tools: ToolBubble[]): ToolBubble | undefined {
+  for (let i = tools.length - 1; i >= 0; i--) {
+    if (tools[i]?.status === "running") return tools[i];
+  }
+  return undefined;
+}
+
+function humanToolLabel(name: string): string {
+  if (name === "search_listings") return "Searching nearby listings…";
+  if (name === "get_listing") return "Loading listing details…";
+  if (name === "draft_request") return "Drafting your request…";
+  return "Working…";
 }
