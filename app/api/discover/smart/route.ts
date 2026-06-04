@@ -71,7 +71,9 @@ export async function GET(request: Request) {
     postType: p.postType,
     contentText: p.contentText,
     mediaType: p.mediaType,
-    mediaUrls: p.mediaUrls,
+    mediaUrls: Array.isArray(p.mediaUrls)
+      ? p.mediaUrls.filter((url): url is string => typeof url === "string")
+      : null,
     metadata:
       p.metadata && typeof p.metadata === "object"
         ? (p.metadata as UnscaledPostFeedItem["metadata"])
