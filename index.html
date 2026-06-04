@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SimplyServed — Your block. On demand.</title>
+    <meta
+      name="description"
+      content="Hyper-local services and neighborhood vibe. Discover trusted local providers, share what's happening on your block, and clip live offers from local businesses."
+    />
+    <meta property="og:title" content="SimplyServed — Your block. On demand." />
+    <meta
+      property="og:description"
+      content="Hyper-local services and neighborhood vibe, built entirely on Next.js native primitives."
+    />
+    <meta property="og:type" content="website" />
+    <style>
+      :root {
+        --bg: #07070b;
+        --card: rgba(255, 255, 255, 0.04);
+        --border: rgba(255, 255, 255, 0.1);
+        --text: #ffffff;
+        --muted: rgba(255, 255, 255, 0.6);
+        --faint: rgba(255, 255, 255, 0.4);
+        --indigo: #818cf8;
+        --fuchsia: #f0abfc;
+        --pink: #f9a8d4;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        background: radial-gradient(
+            circle at 25% 15%,
+            rgba(99, 102, 241, 0.25),
+            transparent 45%
+          ),
+          radial-gradient(
+            circle at 80% 80%,
+            rgba(236, 72, 153, 0.2),
+            transparent 50%
+          );
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      .wrap {
+        max-width: 1040px;
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 22px 0;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 600;
+        font-size: 18px;
+      }
+      .logo {
+        display: grid;
+        place-items: center;
+        height: 30px;
+        width: 30px;
+        border-radius: 9px;
+        background: linear-gradient(135deg, #6366f1, #ec4899);
+        font-size: 15px;
+      }
+      .nav {
+        display: flex;
+        gap: 22px;
+        font-size: 14px;
+        color: var(--muted);
+      }
+      .nav a:hover {
+        color: var(--text);
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 12px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        font-size: 12px;
+        color: var(--muted);
+        background: var(--card);
+      }
+      .hero {
+        display: grid;
+        gap: 40px;
+        align-items: center;
+        padding: 50px 0 80px;
+      }
+      @media (min-width: 900px) {
+        .hero {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      h1 {
+        font-size: 52px;
+        line-height: 1.08;
+        letter-spacing: -0.02em;
+        margin: 20px 0 0;
+      }
+      .grad {
+        background: linear-gradient(135deg, var(--indigo), var(--fuchsia), var(--pink));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .lead {
+        margin-top: 18px;
+        max-width: 520px;
+        color: var(--muted);
+        font-size: 16px;
+      }
+      .btns {
+        margin-top: 26px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 18px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 500;
+        border: 1px solid var(--border);
+        transition: transform 0.15s ease, opacity 0.15s ease;
+      }
+      .btn:hover {
+        transform: translateY(-1px);
+      }
+      .btn-primary {
+        background: linear-gradient(135deg, #6366f1, #ec4899);
+        border-color: transparent;
+      }
+      .btn-ghost {
+        background: var(--card);
+      }
+      .stats {
+        margin-top: 34px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        max-width: 460px;
+      }
+      .stat-n {
+        font-size: 17px;
+        font-weight: 600;
+      }
+      .stat-l {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--faint);
+      }
+      .panel {
+        position: relative;
+        height: 440px;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        overflow: hidden;
+        background: rgba(0, 0, 0, 0.4);
+        padding: 24px;
+        backdrop-filter: blur(8px);
+      }
+      .panel-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .feed {
+        margin-top: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .post {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.05);
+        padding: 12px;
+        font-size: 14px;
+      }
+      .post-meta {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--faint);
+        margin-bottom: 6px;
+      }
+      .tag-offer {
+        color: var(--fuchsia);
+      }
+      .tag-general {
+        color: #7dd3fc;
+      }
+      .tag-business {
+        color: #fcd34d;
+      }
+      section.block {
+        padding: 60px 0;
+      }
+      h2 {
+        font-size: 30px;
+        letter-spacing: -0.01em;
+        margin: 0 0 8px;
+      }
+      .sub {
+        color: var(--muted);
+        max-width: 620px;
+        margin: 0 0 32px;
+      }
+      .pillars {
+        display: grid;
+        gap: 16px;
+      }
+      @media (min-width: 760px) {
+        .pillars {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+      .card {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: var(--card);
+        padding: 22px;
+      }
+      .card .ico {
+        display: grid;
+        place-items: center;
+        height: 38px;
+        width: 38px;
+        border-radius: 11px;
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(236, 72, 153, 0.3));
+        font-size: 18px;
+        margin-bottom: 14px;
+      }
+      .card h3 {
+        margin: 0 0 6px;
+        font-size: 17px;
+      }
+      .card p {
+        margin: 0;
+        font-size: 14px;
+        color: var(--muted);
+      }
+      .cta {
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: var(--card);
+        padding: 40px;
+        display: grid;
+        gap: 20px;
+        align-items: center;
+      }
+      @media (min-width: 760px) {
+        .cta {
+          grid-template-columns: 1.4fr 1fr;
+        }
+        .cta .end {
+          justify-self: end;
+        }
+      }
+      footer {
+        border-top: 1px solid var(--border);
+        padding: 28px 0;
+        color: var(--faint);
+        font-size: 13px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: space-between;
+      }
+      .note {
+        margin-top: 14px;
+        font-size: 12px;
+        color: var(--faint);
+      }
+      .note code {
+        background: rgba(255, 255, 255, 0.08);
+        padding: 1px 6px;
+        border-radius: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <div class="brand">
+          <span class="logo">✦</span>
+          SimplyServed
+        </div>
+        <nav class="nav">
+          <a href="#features">Features</a>
+          <a href="#business">For business</a>
+          <a href="https://github.com/inertiald/SimplyServed">GitHub</a>
+        </nav>
+      </header>
+
+      <section class="hero">
+        <div>
+          <span class="chip">✨ Hyper-local services &amp; community vibe</span>
+          <h1>
+            Your block.<br />
+            <span class="grad">On demand.</span>
+          </h1>
+          <p class="lead">
+            Discover trusted neighborhood services, share what&#39;s actually
+            happening outside your window, and clip live offers from local
+            businesses — all in one beautifully native app.
+          </p>
+          <div class="btns">
+            <a class="btn btn-primary" href="https://github.com/inertiald/SimplyServed">✨ Explore the project</a>
+            <a class="btn btn-ghost" href="#features">See the features →</a>
+          </div>
+          <div class="stats">
+            <div>
+              <div class="stat-n">H3 res-9</div>
+              <div class="stat-l">hex precision</div>
+            </div>
+            <div>
+              <div class="stat-n">&lt; 100ms</div>
+              <div class="stat-l">discover query</div>
+            </div>
+            <div>
+              <div class="stat-n">Real-time</div>
+              <div class="stat-l">post pub/sub</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">📍 live · 0.3 mi radius</div>
+          <div class="feed">
+            <div class="post">
+              <div class="post-meta"><span>Ana</span><span class="tag-offer">OFFER</span></div>
+              Espresso bar opening at 7am, first 20 cups free!
+            </div>
+            <div class="post">
+              <div class="post-meta"><span>Diego</span><span class="tag-general">GENERAL</span></div>
+              Neighborhood cleanup at the park Saturday — bring gloves.
+            </div>
+            <div class="post">
+              <div class="post-meta"><span>Studio Rho</span><span class="tag-business">BUSINESS</span></div>
+              Tonight only: $40 vinyl drop-in classes.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="block" id="features">
+        <h2>Built on Next.js native primitives</h2>
+        <p class="sub">
+          App Router, React Server Components, and Server Actions — with H3 hex
+          discovery, a strict booking state machine, and privacy-preserving
+          signals.
+        </p>
+        <div class="pillars">
+          <div class="card">
+            <div class="ico">🗺️</div>
+            <h3>H3 hex discovery</h3>
+            <p>
+              Listings and posts indexed at neighborhood resolution — surfaced
+              via cached, cursor-paginated route handlers.
+            </p>
+          </div>
+          <div class="card">
+            <div class="ico">🔁</div>
+            <h3>Request state machine</h3>
+            <p>
+              PLACED → DELIVERED → COMPLETED. Strict role-based transitions
+              enforced inside typed Server Actions.
+            </p>
+          </div>
+          <div class="card">
+            <div class="ico">🛡️</div>
+            <h3>Privacy-preserving signals</h3>
+            <p>
+              Reactions are HMAC-bucketed by hour so we get hot-spot data
+              without storing user → listing edges.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="block" id="business">
+        <div class="cta">
+          <div>
+            <span class="chip">🏷️ For local businesses</span>
+            <h2 style="margin-top: 14px">Drop a coupon. Watch your block fill up.</h2>
+            <p class="sub" style="margin-bottom: 0">
+              Publish a live offer in seconds. Anyone in the surrounding hex
+              cells gets it pushed to their feed in real time — with built-in
+              expiration, copy-to-clipboard redemption, and impression
+              analytics.
+            </p>
+          </div>
+          <div class="end">
+            <a class="btn btn-primary" href="https://github.com/inertiald/SimplyServed">Claim your storefront →</a>
+          </div>
+        </div>
+        <p class="note">
+          This page is a static landing page served via GitHub Pages. The full
+          application is a Next.js 15 app — run it locally with
+          <code>docker compose up</code>.
+        </p>
+      </section>
+
+      <footer>
+        <span>© SimplyServed — Hyper-local services + neighborhood vibe.</span>
+        <a href="https://github.com/inertiald/SimplyServed">github.com/inertiald/SimplyServed</a>
+      </footer>
+    </div>
+  </body>
+</html>
