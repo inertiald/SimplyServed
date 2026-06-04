@@ -34,6 +34,7 @@ interface ChatRequest {
  * client uses fetch() with a streaming reader.
  */
 export async function POST(request: Request) {
+  const requestStartedAt = Date.now();
   let body: ChatRequest;
   try {
     body = (await request.json()) as ChatRequest;
@@ -89,6 +90,7 @@ export async function POST(request: Request) {
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      const streamStartedAt = Date.now();
       const send = (event: AgentEvent) => {
         try {
           controller.enqueue(
@@ -122,10 +124,29 @@ export async function POST(request: Request) {
           send(evt);
         }
       } catch (err) {
-        send({ type: "error", error: (err as Error).message });
+        console.error(
+          JSON.stringify({
+            kind: "agent.chat.error",
+            agent: agent.id,
+            durationMs: Date.now() - streamStartedAt,
+            error: (err as Error).message,
+          }),
+        );
+        send({ type: "error", error: "The assistant hit a temporary problem. Please try again." });
       } finally {
         clearInterval(heartbeat);
         request.signal.removeEventListener("abort", onAbort);
+        console.info(
+          JSON.stringify({
+            kind: "agent.chat",
+            agent: agent.id,
+            userId: ctx.userId,
+            durationMs: Date.now() - requestStartedAt,
+            streamDurationMs: Date.now() - streamStartedAt,
+            aborted: request.signal.aborted,
+            historyCount: history.length,
+          }),
+        );
         try {
           controller.close();
         } catch {

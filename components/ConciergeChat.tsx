@@ -78,10 +78,18 @@ export function ConciergeChat({
   const [turns, setTurns] = useState<AgentTurn[]>([]);
   const [input, setInput] = useState(initialPrompt ?? "");
   const [busy, setBusy] = useState(false);
+  const [requestStartedAt, setRequestStartedAt] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState(() => Date.now());
   const [coords, setCoords] = useState({ lat: 37.7749, lng: -122.4194 });
   const [geoLabel, setGeoLabel] = useState<string>("San Francisco (default)");
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    if (!busy) return;
+    const t = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [busy]);
 
   // Geolocate on mount, best-effort.
   useEffect(() => {
@@ -96,6 +104,11 @@ export function ConciergeChat({
     );
   }, []);
 
+  // Warm the local model in the background so first real prompt feels faster.
+  useEffect(() => {
+    fetch("/api/agent/warm", { method: "POST" }).catch(() => undefined);
+  }, []);
+
   // Auto-scroll to bottom on new content.
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -108,6 +121,7 @@ export function ConciergeChat({
     async (text: string) => {
       if (!text.trim() || busy) return;
       setBusy(true);
+      setRequestStartedAt(Date.now());
 
       const userTurn: AgentTurn = {
         id: crypto.randomUUID(),
@@ -202,11 +216,20 @@ export function ConciergeChat({
         );
       } finally {
         setBusy(false);
+        setRequestStartedAt(null);
         abortRef.current = null;
       }
     },
     [agent, busy, coords.lat, coords.lng, turns],
   );
+
+  const runningTool = getRunningTool(turns[turns.length - 1]?.tools ?? []);
+  const elapsedSec = requestStartedAt ? Math.floor((nowTick - requestStartedAt) / 1000) : 0;
+  const loadingLabel = runningTool
+    ? humanToolLabel(runningTool.name)
+    : elapsedSec >= 8
+      ? "Warming local model… first reply can take longer."
+      : "Thinking…";
 
   // Auto-send if the page passed an initialPrompt.
   const initialSent = useRef(false);
@@ -248,7 +271,7 @@ export function ConciergeChat({
         )}
         {busy && turns[turns.length - 1]?.status === "streaming" && (
           <div className="flex items-center gap-2 text-xs text-white/40">
-            <Loader2 size={12} className="animate-spin" /> thinking…
+            <Loader2 size={12} className="animate-spin" /> {loadingLabel}
           </div>
         )}
       </div>
@@ -434,7 +457,6 @@ function ToolChip({ bubble }: { bubble: ToolBubble }) {
       />
       <span className="font-mono">{bubble.name}</span>
       {bubble.summary && <span className="opacity-70">· {bubble.summary}</span>}
-      {bubble.error && <span className="opacity-70">· {bubble.error}</span>}
     </span>
   );
 }
@@ -544,6 +566,20 @@ function dedupe(arr: ListingHit[]): ListingHit[] {
     if (seen.has(l.id)) continue;
     seen.add(l.id);
     out.push(l);
+  }
+
+  function getRunningTool(tools: ToolBubble[]): ToolBubble | undefined {
+    for (let i = tools.length - 1; i >= 0; i--) {
+      if (tools[i]?.status === "running") return tools[i];
+    }
+    return undefined;
+  }
+
+  function humanToolLabel(name: string): string {
+    if (name === "search_listings") return "Searching nearby listings…";
+    if (name === "get_listing") return "Loading listing details…";
+    if (name === "draft_request") return "Drafting your request…";
+    return "Working…";
   }
   return out;
 }
