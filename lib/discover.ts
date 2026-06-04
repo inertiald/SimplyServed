@@ -1,10 +1,10 @@
 export const DISCOVER_RADIUS_OPTIONS = [1, 5, 10, 25] as const;
 
 export type DiscoverRingMiles = (typeof DISCOVER_RADIUS_OPTIONS)[number];
-export type DiscoverSort = "highest-rated" | "newest" | "closest";
+export type DiscoverSort = "recommended" | "highest-rated" | "newest" | "closest";
 
 export const DISCOVER_DEFAULT_RADIUS: DiscoverRingMiles = 5;
-export const DISCOVER_DEFAULT_SORT: DiscoverSort = "highest-rated";
+export const DISCOVER_DEFAULT_SORT: DiscoverSort = "recommended";
 export const DISCOVER_FEED_RING_BY_RADIUS: Record<DiscoverRingMiles, number> = {
   1: 1,
   5: 2,
@@ -23,6 +23,11 @@ export interface DiscoverListingLike {
   ratingAvg?: number;
   ratingCount?: number;
   provider: { name: string };
+  score?: number;
+  rank?: {
+    label: "Trending" | "Recommended" | "Popular Nearby" | "Highly Rated";
+    reasons: string[];
+  };
 }
 
 export interface DiscoverBusinessLike {
@@ -40,7 +45,7 @@ export interface DiscoverBusinessLike {
 }
 
 export type NearbyPlace =
-  | { kind: "listing"; id: string; distanceMiles: number; ratingScore: number; createdAtMs: number; item: DiscoverListingLike }
+  | { kind: "listing"; id: string; distanceMiles: number; ratingScore: number; smartScore: number; createdAtMs: number; item: DiscoverListingLike }
   | { kind: "business"; id: string; distanceMiles: number; ratingScore: number; createdAtMs: number; item: DiscoverBusinessLike };
 
 export function parseDiscoverRadius(value: string | null | undefined): DiscoverRingMiles {
@@ -51,7 +56,10 @@ export function parseDiscoverRadius(value: string | null | undefined): DiscoverR
 }
 
 export function parseDiscoverSort(value: string | null | undefined): DiscoverSort {
-  return value === "newest" || value === "closest" || value === "highest-rated"
+  return value === "recommended" ||
+    value === "newest" ||
+    value === "closest" ||
+    value === "highest-rated"
     ? value
     : DISCOVER_DEFAULT_SORT;
 }
@@ -102,6 +110,7 @@ export function buildNearbyPlaces({
         id: listing.id,
         distanceMiles: haversineMiles(coords, listing),
         ratingScore: listing.ratingAvg ?? 0,
+        smartScore: listing.score ?? 0,
         createdAtMs: new Date(listing.createdAt).getTime(),
         item: listing,
       })),
@@ -130,6 +139,15 @@ export function buildNearbyPlaces({
         right.createdAtMs - left.createdAtMs ||
         right.ratingScore - left.ratingScore ||
         left.distanceMiles - right.distanceMiles
+      );
+    }
+    if (sort === "recommended") {
+      return (
+        (right.kind === "listing" ? right.smartScore : 0) -
+          (left.kind === "listing" ? left.smartScore : 0) ||
+        right.ratingScore - left.ratingScore ||
+        left.distanceMiles - right.distanceMiles ||
+        right.createdAtMs - left.createdAtMs
       );
     }
     return (

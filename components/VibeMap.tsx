@@ -4,11 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
+  AlertCircle,
   Compass,
   Loader2,
   MapPin,
   Plus,
   RefreshCw,
+  Sparkles,
   Tag,
   Briefcase,
   MessageSquare,
@@ -58,12 +60,43 @@ interface VibeMapProps {
   signedIn: boolean;
 }
 
+type SmartFeedResponse = {
+  total: number;
+  timingMs?: number;
+  feed: Array<
+    | {
+        kind: "post";
+        id: string;
+        score: number;
+        postType: PostCardData["postType"];
+        contentText: string;
+        mediaType: PostCardData["mediaType"];
+        mediaUrls: PostCardData["mediaUrls"];
+        metadata?: PostCardData["metadata"];
+        createdAt: string;
+        lat: number;
+        lng: number;
+        user: PostCardData["user"];
+        listing: PostCardData["listing"];
+      }
+    | (DiscoverListingLike & {
+        kind: "listing";
+        score: number;
+      })
+  >;
+};
+
+type SmartPostItem = Extract<SmartFeedResponse["feed"][number], { kind: "post" }>;
+type SmartListingItem = Extract<SmartFeedResponse["feed"][number], { kind: "listing" }>;
+
 export function VibeMap({ initialCoords, providerListings, signedIn }: VibeMapProps) {
   const [coords, setCoords] = useState<Coords>(initialCoords);
   const [posts, setPosts] = useState<PostCardData[]>([]);
   const [listings, setListings] = useState<DiscoverListingLike[]>([]);
   const [businesses, setBusinesses] = useState<DiscoverBusinessLike[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [feedSource, setFeedSource] = useState<"smart" | "legacy">("smart");
   const [composeOpen, setComposeOpen] = useState(false);
   const [activeCell, setActiveCell] = useState<string | null>(null);
   const [selected, setSelected] = useState<MapSelection>(null);
@@ -86,30 +119,82 @@ export function VibeMap({ initialCoords, providerListings, signedIn }: VibeMapPr
 
   const refresh = async () => {
     setLoading(true);
-    try {
-      const feedParams = new URLSearchParams({
-        lat: String(coords.lat),
-        lng: String(coords.lng),
-        ring: String(feedRing),
-      });
-      const discoverParams = new URLSearchParams({
-        lat: String(coords.lat),
-        lng: String(coords.lng),
-        ring: String(ring),
-        sort,
-      });
-      if (category) discoverParams.set("category", category);
-      if (maxRate.trim() !== "") discoverParams.set("maxRate", maxRate.trim());
+    setFetchError(null);
+    const feedParams = new URLSearchParams({
+      lat: String(coords.lat),
+      lng: String(coords.lng),
+      ring: String(feedRing),
+    });
+    const discoverParams = new URLSearchParams({
+      lat: String(coords.lat),
+      lng: String(coords.lng),
+      ring: String(ring),
+    });
+    if (category) discoverParams.set("category", category);
+    if (maxRate.trim() !== "") discoverParams.set("maxRate", maxRate.trim());
+    discoverParams.set("sort", sort === "recommended" ? "highest-rated" : sort);
 
+    try {
+      const smartParams = new URLSearchParams(feedParams);
+      smartParams.set("limit", "60");
+      const requestStartedAt = performance.now();
+      const [smartRes, discoverRes] = await Promise.all([
+        fetch(`/api/discover/smart?${smartParams}`),
+        fetch(`/api/discover?${discoverParams}`),
+      ]);
+
+      if (!discoverRes.ok) {
+        throw new Error(`Discover fetch failed (${discoverRes.status})`);
+      }
+      const discover = await discoverRes.json();
+      setBusinesses(discover.businesses ?? []);
+
+      if (!smartRes.ok) {
+        throw new Error(`Smart Discover unavailable (${smartRes.status})`);
+      }
+
+      const smart = (await smartRes.json()) as SmartFeedResponse;
+      const nextPosts = smart.feed.filter(
+        (item): item is SmartPostItem => item.kind === "post",
+      );
+      const nextListings = smart.feed.filter(
+        (item): item is SmartListingItem => item.kind === "listing",
+      );
+
+      setPosts(nextPosts);
+      setListings(nextListings);
+      setFeedSource("smart");
+      console.info("[discover] smart_feed_loaded", {
+        endpoint: "/api/discover/smart",
+        results: smart.total,
+        timingMs: Math.round(
+          typeof smart.timingMs === "number"
+            ? smart.timingMs
+            : performance.now() - requestStartedAt,
+        ),
+      });
+    } catch (smartError) {
+      const fallbackStartedAt = performance.now();
       const [feedRes, discoverRes] = await Promise.all([
         fetch(`/api/feed?${feedParams}`),
         fetch(`/api/discover?${discoverParams}`),
       ]);
-      const feed = await feedRes.json();
-      const discover = await discoverRes.json();
+      if (!feedRes.ok || !discoverRes.ok) {
+        setFetchError("Couldn’t load neighborhood data. Please try again.");
+        return;
+      }
+      const [feed, discover] = await Promise.all([feedRes.json(), discoverRes.json()]);
       setPosts(feed.posts ?? []);
       setListings(discover.listings ?? []);
       setBusinesses(discover.businesses ?? []);
+      setFeedSource("legacy");
+      setFetchError("Smart ranking is temporarily unavailable. Showing standard results.");
+      console.info("[discover] legacy_fallback_loaded", {
+        endpoint: "/api/feed + /api/discover",
+        results: (feed.posts?.length ?? 0) + (discover.listings?.length ?? 0),
+        timingMs: Math.round(performance.now() - fallbackStartedAt),
+        error: smartError instanceof Error ? smartError.message : "unknown",
+      });
     } finally {
       setLoading(false);
     }
@@ -289,6 +374,7 @@ export function VibeMap({ initialCoords, providerListings, signedIn }: VibeMapPr
               className="ss-input py-2"
               aria-label="Sort nearby places"
             >
+              <option value="recommended">Recommended</option>
               <option value="highest-rated">Highest Rated</option>
               <option value="newest">Newest</option>
               <option value="closest">Closest</option>
@@ -370,6 +456,9 @@ export function VibeMap({ initialCoords, providerListings, signedIn }: VibeMapPr
               <Store size={14} className="text-emerald-300" />
               <span className="font-semibold">Nearby places</span>
               <span className="ss-chip">{nearbyCount}</span>
+              <span className="ss-chip border-white/10 text-[10px] text-white/60">
+                {feedSource === "smart" ? "Smart ranking" : "Standard ranking"}
+              </span>
             </div>
             {selected && (
               <button
@@ -381,9 +470,17 @@ export function VibeMap({ initialCoords, providerListings, signedIn }: VibeMapPr
             )}
           </div>
 
+          {fetchError && nearbyCount > 0 && (
+            <p className="mx-4 mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+              {fetchError}
+            </p>
+          )}
+
           {nearbyCount === 0 ? (
             <p className="px-4 py-6 text-center text-xs text-white/50">
-              No listings or businesses match these filters yet.
+              {fetchError
+                ? "Couldn’t load nearby places right now. Try refresh."
+                : "No listings or businesses match these filters yet."}
             </p>
           ) : (
             <ul className="max-h-64 divide-y divide-white/5 overflow-y-auto">
@@ -406,6 +503,12 @@ export function VibeMap({ initialCoords, providerListings, signedIn }: VibeMapPr
                             {listing.category} · ${listing.hourlyRate}/hr · {listing.provider.name} ·{" "}
                             {place.distanceMiles.toFixed(1)} mi
                           </span>
+                          {listing.rank?.label && (
+                            <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-fuchsia-400/30 bg-fuchsia-500/10 px-2 py-0.5 text-[10px] font-medium text-fuchsia-200">
+                              <Sparkles size={10} />
+                              {listing.rank.label}
+                            </span>
+                          )}
                         </span>
                         {isSel && (
                           <Link
@@ -468,6 +571,14 @@ export function VibeMap({ initialCoords, providerListings, signedIn }: VibeMapPr
         {loading && posts.length === 0 ? (
           <div className="ss-card grid place-items-center p-12 text-white/50">
             <Loader2 className="animate-spin" />
+          </div>
+        ) : fetchError && visiblePosts.length === 0 ? (
+          <div className="ss-card p-8 text-center text-sm text-amber-100">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs">
+              <AlertCircle size={12} />
+              Feed issue
+            </div>
+            <p>{fetchError}</p>
           </div>
         ) : visiblePosts.length === 0 ? (
           <div className="ss-card p-8 text-center text-sm text-white/60">

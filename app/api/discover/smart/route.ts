@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
  *   ?limit=<n>                  — max items to return (default 40, max 100)
  */
 export async function GET(request: Request) {
+  const startedAt = Date.now();
   const { searchParams } = new URL(request.url);
   const h3Param = searchParams.get("h3");
   const lat = searchParams.get("lat");
@@ -69,8 +70,17 @@ export async function GET(request: Request) {
     h3Neighborhood: p.h3Neighborhood,
     postType: p.postType,
     contentText: p.contentText,
+    mediaType: p.mediaType,
+    mediaUrls: p.mediaUrls,
+    metadata:
+      p.metadata && typeof p.metadata === "object"
+        ? (p.metadata as UnscaledPostFeedItem["metadata"])
+        : null,
+    lat: p.lat,
+    lng: p.lng,
     user: p.user,
     listing: p.listing,
+    rank: rankPost(p.postType),
   }));
 
   const listingItems: UnscaledListingFeedItem[] = rawListings.map((l) => ({
@@ -82,11 +92,19 @@ export async function GET(request: Request) {
     description: l.description,
     category: l.category,
     hourlyRate: l.hourlyRate,
+    lat: l.lat,
+    lng: l.lng,
     ratingAvg: l.ratingAvg,
     ratingCount: l.ratingCount,
     impressionCount: l._count.impressions,
     requestCount: l._count.requests,
     provider: l.provider,
+    rank: rankListing({
+      ratingAvg: l.ratingAvg,
+      ratingCount: l.ratingCount,
+      impressionCount: l._count.impressions,
+      requestCount: l._count.requests,
+    }),
   }));
 
   // ── 4. Score + merge + sort ───────────────────────────────────────────────
@@ -102,6 +120,40 @@ export async function GET(request: Request) {
     cells,
     indexHint: lat && lng ? indexCoords(Number(lat), Number(lng)).h3Neighborhood : null,
     total: feed.length,
+    timingMs: Date.now() - startedAt,
     feed,
   });
+}
+
+function rankPost(postType: string): UnscaledPostFeedItem["rank"] {
+  if (postType === "OFFER") {
+    return { label: "Trending", reasons: ["Live offer"] };
+  }
+  if (postType === "BUSINESS") {
+    return { label: "Trending", reasons: ["Business update"] };
+  }
+  return { label: "Recent", reasons: ["Fresh activity nearby"] };
+}
+
+function rankListing({
+  ratingAvg,
+  ratingCount,
+  impressionCount,
+  requestCount,
+}: {
+  ratingAvg: number;
+  ratingCount: number;
+  impressionCount: number;
+  requestCount: number;
+}): UnscaledListingFeedItem["rank"] {
+  if (requestCount >= 5 || impressionCount >= 100) {
+    return { label: "Trending", reasons: ["High engagement"] };
+  }
+  if (ratingAvg >= 4.7 && ratingCount >= 10) {
+    return { label: "Highly Rated", reasons: ["Excellent reviews"] };
+  }
+  if (impressionCount >= 40 || requestCount >= 2) {
+    return { label: "Popular Nearby", reasons: ["Popular in your area"] };
+  }
+  return { label: "Recommended", reasons: ["Strong local fit"] };
 }

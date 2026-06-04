@@ -19,8 +19,17 @@ export interface PostFeedItem {
   h3Neighborhood: string;
   postType: string;
   contentText: string;
+  mediaType: "IMAGE" | "VIDEO" | "TEXT_ONLY";
+  mediaUrls: string[] | null;
+  metadata?: { offer?: { code: string; discount: string; expiresAt: string } } | null;
+  lat: number;
+  lng: number;
   user: { id: string; name: string; avatarUrl: string | null };
   listing: { id: string; title: string; category: string } | null;
+  rank: {
+    label: "Trending" | "Recent";
+    reasons: string[];
+  };
 }
 
 export interface ListingFeedItem {
@@ -33,11 +42,17 @@ export interface ListingFeedItem {
   description: string;
   category: string;
   hourlyRate: number;
+  lat: number;
+  lng: number;
   ratingAvg: number;
   ratingCount: number;
   impressionCount: number;
   requestCount: number;
   provider: { id: string; name: string; avatarUrl: string | null };
+  rank: {
+    label: "Trending" | "Recommended" | "Popular Nearby" | "Highly Rated";
+    reasons: string[];
+  };
 }
 
 export type FeedItem = PostFeedItem | ListingFeedItem;

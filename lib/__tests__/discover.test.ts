@@ -3,7 +3,9 @@ import { describe, it } from "node:test";
 import {
   buildNearbyPlaces,
   DISCOVER_DEFAULT_RADIUS,
+  DISCOVER_DEFAULT_SORT,
   parseDiscoverRadius,
+  parseDiscoverSort,
 } from "../discover";
 
 const coords = { lat: 37.7749, lng: -122.4194 };
@@ -12,6 +14,18 @@ describe("parseDiscoverRadius", () => {
   it("accepts supported radius options", () => {
     assert.equal(parseDiscoverRadius("1"), 1);
     assert.equal(parseDiscoverRadius("25"), 25);
+  });
+
+  describe("parseDiscoverSort", () => {
+    it("accepts supported sort options", () => {
+      assert.equal(parseDiscoverSort("recommended"), "recommended");
+      assert.equal(parseDiscoverSort("closest"), "closest");
+    });
+
+    it("falls back to default for unsupported values", () => {
+      assert.equal(parseDiscoverSort("random"), DISCOVER_DEFAULT_SORT);
+      assert.equal(parseDiscoverSort(null), DISCOVER_DEFAULT_SORT);
+    });
   });
 
   it("falls back to the default radius for unsupported values", () => {
@@ -32,6 +46,7 @@ describe("buildNearbyPlaces", () => {
       createdAt: "2026-06-02T12:00:00.000Z",
       ratingAvg: 4.9,
       ratingCount: 20,
+      score: 0.62,
       provider: { name: "Alex" },
     },
     {
@@ -44,6 +59,7 @@ describe("buildNearbyPlaces", () => {
       createdAt: "2026-06-01T12:00:00.000Z",
       ratingAvg: 4.5,
       ratingCount: 8,
+      score: 0.9,
       provider: { name: "Sam" },
     },
     {
@@ -56,6 +72,7 @@ describe("buildNearbyPlaces", () => {
       createdAt: "2026-06-03T12:00:00.000Z",
       ratingAvg: 4.2,
       ratingCount: 3,
+      score: 0.52,
       provider: { name: "Jordan" },
     },
   ];
@@ -129,5 +146,16 @@ describe("buildNearbyPlaces", () => {
 
     assert.equal(places[0]?.id, "business-home");
     assert.equal(places[1]?.id, "listing-high");
+  });
+
+  it("sorts by smart score when recommended is selected", () => {
+    const places = buildNearbyPlaces({
+      listings,
+      businesses,
+      coords,
+      sort: "recommended",
+    });
+
+    assert.equal(places[0]?.id, "listing-budget");
   });
 });
