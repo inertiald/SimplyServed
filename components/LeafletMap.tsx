@@ -64,6 +64,32 @@ export interface LeafletMapProps {
   onSelect: (selection: MapSelection) => void;
 }
 
+/**
+ * Forces Leaflet to recompute its container size.
+ *
+ * The map mounts inside an `aspect-square` container that often still has a
+ * zero/partial size on first paint (it's lazy-loaded via `dynamic`/`ssr:false`).
+ * Without this, Leaflet only requests the handful of tiles that fit the stale
+ * size — the "only a few blocks load" symptom. Re-invalidating after mount and
+ * on resize makes it fill the full viewport.
+ */
+function InvalidateSize() {
+  const map = useMap();
+  useEffect(() => {
+    const invalidate = () => map.invalidateSize();
+    // Run after the container has been laid out.
+    const raf = requestAnimationFrame(invalidate);
+    const timeout = setTimeout(invalidate, 250);
+    window.addEventListener("resize", invalidate);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timeout);
+      window.removeEventListener("resize", invalidate);
+    };
+  }, [map]);
+  return null;
+}
+
 /** Re-centers the Leaflet map whenever the user's coordinates change. */
 function MapRecenter({ lat, lng }: { lat: number; lng: number }) {
   const map = useMap();
@@ -118,7 +144,13 @@ export function LeafletMap({
       zoom={14}
       style={{ height: "100%", width: "100%" }}
       scrollWheelZoom
+      preferCanvas
+      zoomSnap={0.25}
+      zoomDelta={0.5}
+      wheelPxPerZoomLevel={120}
+      wheelDebounceTime={40}
     >
+      <InvalidateSize />
       <MapRecenter lat={coords.lat} lng={coords.lng} />
       <FlyToSelection lat={focus?.lat ?? null} lng={focus?.lng ?? null} />
 
