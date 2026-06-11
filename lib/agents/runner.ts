@@ -81,9 +81,24 @@ export async function* runAgent(params: {
   signal?: AbortSignal;
 }): AsyncGenerator<AgentEvent, void, void> {
   const { agent, ctx, history, userMessage, signal } = params;
+  const requestStartedAt = Date.now();
+  const safeMeta = {
+    kind: "agent.run",
+    agentId: agent.id,
+    userId: ctx.userId,
+  };
 
   // Health check up-front so we can give a friendly error.
+  const availabilityStartedAt = Date.now();
   if (!(await isOllamaAvailable())) {
+    console.warn(
+      JSON.stringify({
+        ...safeMeta,
+        stage: "availability_check",
+        durationMs: Date.now() - availabilityStartedAt,
+        ok: false,
+      }),
+    );
     yield {
       type: "error",
       error:
@@ -91,6 +106,14 @@ export async function* runAgent(params: {
     };
     return;
   }
+  console.info(
+    JSON.stringify({
+      ...safeMeta,
+      stage: "availability_check",
+      durationMs: Date.now() - availabilityStartedAt,
+      ok: true,
+    }),
+  );
 
   const toolDefs = agent.tools.map((t) => t.definition);
   const toolByName = new Map(agent.tools.map((t) => [t.name, t]));
@@ -110,6 +133,7 @@ export async function* runAgent(params: {
     // textual answer or one or more tool calls. Streaming tokens here would
     // render half-baked tool-call JSON to the user.
     let assistant: ChatMessage;
+    const llmStartedAt = Date.now();
     try {
       assistant = await chat({
         messages,
@@ -117,6 +141,16 @@ export async function* runAgent(params: {
         temperature: agent.temperature,
         signal,
       });
+      console.info(
+        JSON.stringify({
+          ...safeMeta,
+          stage: "llm_turn",
+          step,
+          durationMs: Date.now() - llmStartedAt,
+          toolCallCount: assistant.tool_calls?.length ?? 0,
+          hasContent: Boolean(assistant.content?.trim()),
+        }),
+      );
     } catch (err) {
       if (err instanceof OllamaUnavailableError) {
         yield { type: "error", error: "AI model went offline mid-turn." };
@@ -191,15 +225,38 @@ export async function* runAgent(params: {
         messages.push(makeToolMessage(call, { error: err }));
         continue;
       }
+      const toolStartedAt = Date.now();
       try {
         const result = await tool.run(call.function.arguments, ctx);
         const summary = tool.summarize?.(result) ?? "done";
+        console.info(
+          JSON.stringify({
+            ...safeMeta,
+            stage: "tool",
+            step,
+            tool: tool.name,
+            durationMs: Date.now() - toolStartedAt,
+            ok: true,
+          }),
+        );
         yield { type: "tool_result", name: tool.name, summary, data: result };
         messages.push(makeToolMessage(call, result));
       } catch (err) {
         const msg = (err as Error).message;
-        yield { type: "tool_error", name: tool.name, error: msg };
-        messages.push(makeToolMessage(call, { error: msg }));
+        const publicMsg = `${tool.name} is temporarily unavailable.`;
+        console.error(
+          JSON.stringify({
+            ...safeMeta,
+            stage: "tool",
+            step,
+            tool: tool.name,
+            durationMs: Date.now() - toolStartedAt,
+            ok: false,
+            error: msg,
+          }),
+        );
+        yield { type: "tool_error", name: tool.name, error: publicMsg };
+        messages.push(makeToolMessage(call, { error: publicMsg }));
       }
     }
     // Loop back; the model now has tool outputs and should produce an answer.
@@ -209,6 +266,15 @@ export async function* runAgent(params: {
     type: "error",
     error: `Agent gave up after ${maxSteps} tool rounds without answering.`,
   };
+  console.warn(
+    JSON.stringify({
+      ...safeMeta,
+      stage: "done",
+      durationMs: Date.now() - requestStartedAt,
+      finished: false,
+      reason: "max_steps_exceeded",
+    }),
+  );
 }
 
 function makeToolMessage(call: ToolCall, result: unknown): ChatMessage {
