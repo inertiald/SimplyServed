@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowUp,
+  BookOpen,
+  Check,
+  ClipboardCopy,
   Loader2,
   MapPin,
   Sparkles,
@@ -142,10 +145,25 @@ export function ConciergeChat({
       setInput("");
 
       // Build short history for the API: last few user/assistant text pairs.
+      // We also inject listing context (IDs) from prior assistant turns so the
+      // model can reference them in follow-up messages like "book the second one".
       const history = turns
-        .filter((t) => t.status === "done" && t.text)
+        .filter((t) => t.status === "done" && (t.text || (t.role === "assistant" && t.listings?.length)))
         .slice(-6)
-        .map((t) => ({ role: t.role, content: t.text }));
+        .map((t) => {
+          if (t.role === "user") return { role: t.role as "user", content: t.text };
+          // For assistant turns: prepend a compact listing-context line so the
+          // model knows which IDs it found, even in follow-up messages.
+          let content = t.text ?? "";
+          if (t.listings && t.listings.length > 0) {
+            const ctx = t.listings
+              .map((l) => `"${l.title}" by ${l.provider} (id: ${l.id}, $${l.hourlyRate}/hr)`)
+              .join("; ");
+            content = `[Listings found: ${ctx}]\n${content}`.trim();
+          }
+          return { role: t.role as "assistant", content };
+        })
+        .filter((m) => m.content);
 
       const ctrl = new AbortController();
       abortRef.current = ctrl;
@@ -266,7 +284,18 @@ export function ConciergeChat({
           t.role === "user" ? (
             <UserBubble key={t.id} text={t.text} />
           ) : (
-            <AssistantBubble key={t.id} turn={t} />
+            <AssistantBubble
+              key={t.id}
+              turn={t}
+              onDraft={
+                agent === "concierge"
+                  ? (l) =>
+                      send(
+                        `Please draft a request for "${l.title}" (listing id: ${l.id}) by ${l.provider}.`,
+                      )
+                  : undefined
+              }
+            />
           ),
         )}
         {busy && turns[turns.length - 1]?.status === "streaming" && (
@@ -403,7 +432,13 @@ function UserBubble({ text }: { text: string }) {
   );
 }
 
-function AssistantBubble({ turn }: { turn: AgentTurn }) {
+function AssistantBubble({
+  turn,
+  onDraft,
+}: {
+  turn: AgentTurn;
+  onDraft?: (listing: ListingHit) => void;
+}) {
   return (
     <div className="flex flex-col gap-2">
       {turn.tools && turn.tools.length > 0 && (
@@ -424,7 +459,7 @@ function AssistantBubble({ turn }: { turn: AgentTurn }) {
       {turn.listings && turn.listings.length > 0 && (
         <div className="grid gap-2 sm:grid-cols-2">
           {dedupe(turn.listings).map((l) => (
-            <ListingHitCard key={l.id} listing={l} />
+            <ListingHitCard key={l.id} listing={l} onDraft={onDraft} />
           ))}
         </div>
       )}
@@ -461,12 +496,15 @@ function ToolChip({ bubble }: { bubble: ToolBubble }) {
   );
 }
 
-function ListingHitCard({ listing }: { listing: ListingHit }) {
+function ListingHitCard({
+  listing,
+  onDraft,
+}: {
+  listing: ListingHit;
+  onDraft?: (listing: ListingHit) => void;
+}) {
   return (
-    <Link
-      href={`/listings/${listing.id}`}
-      className="ss-card group flex flex-col gap-2 p-3 transition hover:-translate-y-0.5 hover:bg-white/[0.05]"
-    >
+    <div className="ss-card group flex flex-col gap-2 p-3 transition hover:-translate-y-0.5 hover:bg-white/[0.05]">
       <div className="flex items-start justify-between gap-2">
         <span className="ss-chip text-[10px]">{listing.category}</span>
         <span className="text-sm font-semibold text-white">
@@ -474,16 +512,46 @@ function ListingHitCard({ listing }: { listing: ListingHit }) {
           <span className="text-[10px] text-white/50">/hr</span>
         </span>
       </div>
-      <div className="text-sm font-semibold leading-tight text-white group-hover:text-indigo-300">
+      <Link
+        href={`/listings/${listing.id}`}
+        className="text-sm font-semibold leading-tight text-white hover:text-indigo-300"
+      >
         {listing.title}
-      </div>
+      </Link>
       <div className="text-[11px] text-white/50">by {listing.provider}</div>
       <p className="line-clamp-2 text-[11px] text-white/60">{listing.description}</p>
-    </Link>
+      {onDraft && (
+        <button
+          onClick={() => onDraft(listing)}
+          className="mt-1 flex items-center gap-1 self-start rounded-lg border border-indigo-500/40 bg-indigo-500/10 px-2.5 py-1 text-[11px] text-indigo-300 transition hover:bg-indigo-500/20"
+        >
+          <BookOpen size={11} />
+          Draft request
+        </button>
+      )}
+    </div>
   );
 }
 
 function DraftCard({ draft }: { draft: DraftRequest }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    const text = draft.notes
+      ? `Booking: ${draft.title}\nHours: ${draft.hours}\nNotes: ${draft.notes}\nEstimated total: $${draft.quote.total.toFixed(2)}`
+      : `Booking: ${draft.title}\nHours: ${draft.hours}\nEstimated total: $${draft.quote.total.toFixed(2)}`;
+    await navigator.clipboard.writeText(text).catch(() => undefined);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const bookingUrl = (() => {
+    const params = new URLSearchParams();
+    params.set("hours", String(draft.hours));
+    if (draft.notes) params.set("notes", draft.notes);
+    return `${draft.bookingUrl}?${params.toString()}`;
+  })();
+
   return (
     <div className="ss-card border-fuchsia-500/30 bg-gradient-to-br from-fuchsia-500/10 to-indigo-500/10 p-4">
       <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-fuchsia-200/80">
@@ -491,7 +559,7 @@ function DraftCard({ draft }: { draft: DraftRequest }) {
       </div>
       <div className="mt-1 text-sm font-semibold text-white">{draft.title}</div>
       {draft.notes && (
-        <p className="mt-1 text-xs text-white/70">“{draft.notes}”</p>
+        <p className="mt-1 text-xs text-white/70">"{draft.notes}"</p>
       )}
       <div className="mt-3 flex items-center justify-between text-xs">
         <span className="text-white/60">
@@ -501,12 +569,22 @@ function DraftCard({ draft }: { draft: DraftRequest }) {
           ${draft.quote.total.toFixed(2)}
         </span>
       </div>
-      <Link
-        href={draft.bookingUrl}
-        className="ss-btn-primary mt-3 w-full justify-center text-xs"
-      >
-        Open booking form →
-      </Link>
+      <div className="mt-3 flex gap-2">
+        <Link
+          href={bookingUrl}
+          className="ss-btn-primary flex-1 justify-center text-xs"
+        >
+          Open booking form →
+        </Link>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1 rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-xs text-white/70 transition hover:bg-white/10"
+          title="Copy draft to clipboard"
+        >
+          {copied ? <Check size={11} className="text-emerald-400" /> : <ClipboardCopy size={11} />}
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
     </div>
   );
 }

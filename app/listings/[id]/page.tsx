@@ -12,10 +12,12 @@ export const dynamic = "force-dynamic";
 
 export default async function ListingDetail({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ notes?: string; hours?: string }>;
 }) {
-  const { id } = await params;
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
   const listing = await prisma.listing.findUnique({
     where: { id },
     include: {
@@ -35,6 +37,10 @@ export default async function ListingDetail({
     take: 8,
     include: { author: { select: { name: true } } },
   });
+
+  // Pre-fill values forwarded from the Concierge draft card.
+  const defaultHours = sp.hours ? Math.max(1, Math.min(24, Number(sp.hours) || 1)) : undefined;
+  const defaultNotes = sp.notes?.slice(0, 4000) || undefined;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
@@ -133,7 +139,7 @@ export default async function ListingDetail({
         ) : isOwnListing ? (
           <p className="text-sm text-white/60">This is your listing — manage it from your dashboard.</p>
         ) : (
-          <BookForm listingId={listing.id} hourlyRate={listing.hourlyRate} />
+          <BookForm listingId={listing.id} hourlyRate={listing.hourlyRate} defaultHours={defaultHours} defaultNotes={defaultNotes} />
         )}
       </aside>
     </div>

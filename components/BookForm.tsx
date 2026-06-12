@@ -8,13 +8,23 @@ import type { ActionResult } from "@/app/actions/auth";
 import { calculateFees } from "@/lib/payments";
 import { useState } from "react";
 
-export function BookForm({ listingId, hourlyRate }: { listingId: string; hourlyRate: number }) {
+export function BookForm({
+  listingId,
+  hourlyRate,
+  defaultHours,
+  defaultNotes,
+}: {
+  listingId: string;
+  hourlyRate: number;
+  defaultHours?: number;
+  defaultNotes?: string;
+}) {
   const router = useRouter();
   const [state, action, pending] = useActionState<ActionResult | undefined, FormData>(
     createServiceRequestAction,
     undefined,
   );
-  const [hours, setHours] = useState(1);
+  const [hours, setHours] = useState(defaultHours ?? 1);
   const fees = calculateFees(hourlyRate, hours);
 
   useEffect(() => {
@@ -48,7 +58,13 @@ export function BookForm({ listingId, hourlyRate }: { listingId: string; hourlyR
 
       <div>
         <label className="ss-label" htmlFor="notes">Notes (optional)</label>
-        <textarea id="notes" name="notes" rows={2} className="ss-input resize-none" />
+        <textarea
+          id="notes"
+          name="notes"
+          rows={2}
+          className="ss-input resize-none"
+          defaultValue={defaultNotes ?? ""}
+        />
       </div>
 
       <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm">
