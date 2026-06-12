@@ -559,7 +559,9 @@ function DraftCard({ draft }: { draft: DraftRequest }) {
       </div>
       <div className="mt-1 text-sm font-semibold text-white">{draft.title}</div>
       {draft.notes && (
-        <p className="mt-1 text-xs text-white/70">"{draft.notes}"</p>
+        <p className="mt-1 text-xs text-white/70">
+          <span aria-hidden>\u201c</span>{draft.notes}<span aria-hidden>\u201d</span>
+        </p>
       )}
       <div className="mt-3 flex items-center justify-between text-xs">
         <span className="text-white/60">

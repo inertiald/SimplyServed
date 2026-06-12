@@ -39,8 +39,12 @@ export default async function ListingDetail({
   });
 
   // Pre-fill values forwarded from the Concierge draft card.
-  const defaultHours = sp.hours ? Math.max(1, Math.min(24, Number(sp.hours) || 1)) : undefined;
-  const defaultNotes = sp.notes?.slice(0, 4000) || undefined;
+  const rawHours = Number(sp.hours);
+  const defaultHours =
+    sp.hours && Number.isFinite(rawHours) && rawHours >= 1
+      ? Math.min(24, Math.floor(rawHours))
+      : undefined;
+  const defaultNotes = sp.notes ? sp.notes.slice(0, 4000) : undefined;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">

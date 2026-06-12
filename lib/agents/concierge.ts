@@ -246,10 +246,13 @@ const get_listing: AgentTool = {
     },
   },
   async run(args) {
-    const id = args.id as string;
+    const id = (args.id as string | undefined)?.trim() ?? "";
     try {
-      const l = await prisma.listing.findUnique({
-        where: { id },
+      const l = await resolveListing(id);
+      if (!l) return { error: "Listing not found. Call search_listings first and pass the exact `id` value from those results." };
+      // Reload with full fields if we only have a stub from resolveListing.
+      const full = await prisma.listing.findUnique({
+        where: { id: l.id },
         select: {
           id: true,
           title: true,
@@ -259,14 +262,14 @@ const get_listing: AgentTool = {
           provider: { select: { name: true } },
         },
       });
-      if (!l) return { error: "Listing not found. Make sure you used the exact `id` value from search_listings." };
+      if (!full) return { error: "Listing details are temporarily unavailable." };
       return {
-        id: l.id,
-        title: l.title,
-        category: l.category,
-        hourlyRate: l.hourlyRate,
-        provider: l.provider.name,
-        description: l.description,
+        id: full.id,
+        title: full.title,
+        category: full.category,
+        hourlyRate: full.hourlyRate,
+        provider: full.provider.name,
+        description: full.description,
       };
     } catch (err) {
       console.error(
